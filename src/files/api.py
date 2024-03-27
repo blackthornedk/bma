@@ -381,9 +381,7 @@ def file_get(request, file_uuid: uuid.UUID):
         "view_basefile",
         basefile,
     ):
-        # https://github.com/vitalik/django-ninja/issues/610
-        #return 200, {"bma_response": basefile}
-        return HttpResponse(SingleFileResponseSchema.from_orm({"bma_response": basefile}).json(), content_type="application/json")
+        return 200, {"bma_response": basefile}
     else:
         return 403, {"message": "Permission denied."}
 
