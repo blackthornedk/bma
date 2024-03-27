@@ -178,7 +178,7 @@ async function uploadFiles() {
         console.log("calling uploadFile ...");
         try {
             response = await uploadFile(fd);
-            UpdateStatus(fd.digest, "check", "Upload OK - file UUID " + response.uuid);
+            UpdateStatus(fd.digest, "check", "Upload OK - file UUID " + response.bma_response.uuid);
         } catch (error) {
             UpdateStatus(fd.digest, "exclamation-times", "Upload error: " + error);
         }

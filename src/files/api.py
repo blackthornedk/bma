@@ -114,7 +114,7 @@ def upload(request, f: UploadedFile, metadata: UploadRequestSchema):
     assign_perm("change_basefile", request.user, uploaded_file)
     assign_perm("delete_basefile", request.user, uploaded_file)
 
-    return 201, uploaded_file
+    return 201, {"bma_response": uploaded_file}
 
 
 @router.patch(
@@ -547,6 +547,3 @@ def file_delete(request, file_uuid: uuid.UUID, check: bool = None):
         basefile.status = "PENDING_DELETION"
         basefile.save()
         return 204, None
-
-
-

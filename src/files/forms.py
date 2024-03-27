@@ -1,10 +1,10 @@
-from django import forms
-
+from utils.filefield import MultipleFileField
 from .models import BaseFile
+from django import forms
 
 
 class UploadForm(forms.ModelForm):
-    files = forms.FileField(widget=forms.ClearableFileInput())
+    files = MultipleFileField()
 
     class Meta:
         model = BaseFile

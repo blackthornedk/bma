@@ -18,7 +18,6 @@ from files.models import BaseFile, StatusChoices
 from utils.filters import SortingChoices
 from utils.schema import ApiMessageSchema, ApiResponseSchema, ObjectPermissionSchema
 from utils.permissions import get_object_permissions_schema
-from utils.request import context_request
 
 
 class UploadRequestSchema(ModelSchema):
@@ -99,22 +98,22 @@ class FileResponseSchema(ModelSchema):
         ]
 
     @staticmethod
-    def resolve_albums(obj, request):
+    def resolve_albums(obj, context):
         return [str(x) for x in obj.albums.values_list("uuid", flat=True)]
 
     @staticmethod
-    def resolve_filename(obj, request):
+    def resolve_filename(obj, context):
         return Path(obj.original.path).name
 
     @staticmethod
-    def resolve_size_bytes(obj, request):
+    def resolve_size_bytes(obj, context):
         if os.path.exists(obj.original.path):
             return obj.original.size
         else:
             return 0
 
     @staticmethod
-    def resolve_links(obj, request):
+    def resolve_links(obj, context):
         links = {
             "self": reverse("api-v1-json:file_get", kwargs={"file_uuid": obj.uuid}),
             "approve": reverse(
@@ -152,12 +151,12 @@ class FileResponseSchema(ModelSchema):
         return links
 
     @staticmethod
-    def resolve_status(obj, request):
+    def resolve_status(obj, context):
         return StatusChoices[obj.status].label
 
     @staticmethod
-    def resolve_permissions(obj, request):
-        return get_object_permissions_schema(obj, request)
+    def resolve_permissions(obj, context):
+        return get_object_permissions_schema(obj, context["request"])
 
 
 class SingleFileResponseSchema(ApiResponseSchema):
