@@ -31,12 +31,9 @@
             }
             if (attrs) {
                 Object.assign(elem, attrs);
-                // assign skips data- and hx- attributes for some reason, set them manually
-                // TODO: maybe skip .assign() and do everything in the loop?
+                // assign skips onclick and data- and hx- attributes for some reason, set them manually
                 for (const key in attrs) {
-                    if (key.startsWith("data-") || key.startsWith("hx-")) {
-                        elem.setAttribute(key, attrs[key]);
-                    };
+                    elem.setAttribute(key, attrs[key]);
                 };
             };
             if (children) {
@@ -97,6 +94,9 @@
                     $this.createNode("i", "filetype", {"data-toggle": "tooltip", "data-placement": "bottom"}),
                     $this.createNode("i", "status", {"data-toggle": "tooltip", "data-placement": "bottom"}),
                     $this.createNode("span", ["badge", "text-bg-dark"], {"data-toggle": "tooltip", "data-placement": "bottom"}),
+                    $this.createNode("a", "copyuuid", {}, [
+                        $this.createNode("i", "copyuuid fa-solid fa-clipboard", {"data-toggle": "tooltip", "data-placement": "bottom", "title": "Copy UUID to clipboard",}),
+                    ]),
                 ]),
             ]);
 
@@ -464,8 +464,6 @@
                 $this.updateStatus("Removing files...", true);
                 let uuids = [];
                 let file;
-                //console.log(typeof(data));
-                //console.log(data);
                 for (file in data) {
                     console.log("processing file " + file);
                     uuids.push(data[file]["uuid"]);
@@ -488,16 +486,21 @@
                 "audio": 0,
                 "document": 0,
             };
+            // loop over all files in the json
             for (const file in data) {
+                // update total filesize counter
                 size += parseInt(data[file]["size_bytes"]);
+                // update file type counter
                 counts[data[file]["filetype"]] += 1;
+                // check if this file is already in the filebrowser
                 let existing = outer.querySelector("div[data-bma-file-uuid='" + data[file]["uuid"] + "']");
                 if (existing) {
                     if (existing.dataset.bmaFileLastUpdate == data[file]["updated"]) {
-                        // file has not been updated
+                        // file timestamp has not been updated,
+                        // no further action needed for this file
                         continue;
                     } else {
-                        // file has been updated
+                        // file timestamp has been updated, remove existing from filebrowser and add again
                         existing.remove();
                     };
                 };
@@ -518,6 +521,9 @@
                 fi = clone.querySelector(".card-footer.file-info > span");
                 fi.innerHTML = data[file]["albums"].length;
                 fi.setAttribute("title", "This " + data[file]["filetype"] + " is in " + data[file]["albums"].length + " albums");
+                // set UUID copy button
+                fi = clone.querySelector(".card-footer.file-info > a.copyuuid");
+                fi.setAttribute("onclick", "navigator.clipboard.writeText('" + data[file]["uuid"] + "')");
                 // add file metadata attributes
                 clone.dataset.bmaFileUuid=data[file]["uuid"];
                 clone.dataset.bmaFileLastUpdate=data[file]["updated"];
@@ -561,7 +567,7 @@
                     const selectable = new Selectable({
                         appendTo: $this.container,
                         filter: $this.container.querySelectorAll(".card"),
-                        ignore: ".navbar",
+                        ignore: [".card-footer", ".navbar"],
                     });
                     // attach the event listener
                     selectable.on('end', $this.updateSummary);
