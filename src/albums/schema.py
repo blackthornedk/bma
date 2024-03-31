@@ -43,7 +43,7 @@ class AlbumResponseSchema(ModelSchema):
         ]
 
     @staticmethod
-    def resolve_links(obj, request):
+    def resolve_links(obj, context):
         return {
             "self": reverse("api-v1-json:album_get", kwargs={"album_uuid": obj.uuid}),
         }
@@ -51,9 +51,9 @@ class AlbumResponseSchema(ModelSchema):
 
 class SingleAlbumResponseSchema(ApiResponseSchema):
     """The schema used to return a response with a single album object."""
-    response: AlbumResponseSchema
+    bma_response: AlbumResponseSchema
 
 
 class MultipleAlbumResponseSchema(ApiResponseSchema):
     """The schema used to return a response with multiple album objects."""
-    response: List[AlbumResponseSchema]
+    bma_response: List[AlbumResponseSchema]

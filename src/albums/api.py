@@ -26,7 +26,7 @@ query = Query(...)
 
 
 @router.post(
-    "/albums/",
+    "/create/",
     response={201: SingleAlbumResponseSchema},
     summary="Create a new album",
 )
@@ -46,7 +46,7 @@ def album_create(request, payload: AlbumRequestSchema):
     assign_perm("delete_album", request.user, album)
 
     # return response
-    return 201, album
+    return 201, {"bma_response": album}
 
 
 @router.get(
@@ -57,7 +57,8 @@ def album_create(request, payload: AlbumRequestSchema):
 )
 def album_get(request, album_uuid: uuid.UUID):
     """Return an album."""
-    return get_object_or_404(Album, uuid=album_uuid)
+    album = get_object_or_404(Album, uuid=album_uuid)
+    return 200, {"bma_response": album}
 
 
 @router.get(
@@ -94,7 +95,7 @@ def album_list(request, filters: AlbumFilters = query):
     if filters.limit:
         albums = albums[: filters.limit]
 
-    return albums
+    return 200, {"bma_response": albums}
 
 
 @router.put(
@@ -151,7 +152,7 @@ def album_update(
         album.save()
     if "files" in payload.dict():
         album.files.set(payload.dict()["files"])
-    return album
+    return 200, {"bma_response": album}
 
 
 @router.delete(
