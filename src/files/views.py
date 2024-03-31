@@ -19,6 +19,7 @@ from django.views.generic import TemplateView
 from django.views.generic import UpdateView
 from guardian.mixins import PermissionRequiredMixin
 from guardian.shortcuts import assign_perm
+from django.core.exceptions import PermissionDenied
 
 from audios.models import Audio
 from documents.models import Document
@@ -128,9 +129,9 @@ class FilesUnpublishUpdateView(PermissionRequiredMixin, FilesApprovalMixin, Upda
 
 def bma_media_view(request, path, accel):
     """Serve media files using nginx x-accel-redirect, or serve directly for dev use."""
-    # get BaseFile uuid from the path
+    # get last uuid from the path
     if match := re.match(
-        r".*?/bma_(?:picture|video|audio|document)_([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}).*?",
+        r"^.*([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}).*$",
         path,
     ):
         # get the file from database
@@ -142,9 +143,10 @@ def bma_media_view(request, path, accel):
             )
             raise Http404()
 
+        # check file permissions
         if not request.user.has_perm("files.view_basefile", dbfile) and not User.get_anonymous().has_perm("files.view_basefile", dbfile):
             # neither the current user nor the anonymous user has permissions to view this file
-            raise Http404()
+            raise PermissionDenied
 
         # check if the file exists in the filesystem
         if not Path(dbfile.original.path).exists():
