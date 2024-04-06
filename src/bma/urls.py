@@ -16,11 +16,8 @@ urlpatterns = [
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     path("", include("frontpage.urls")),
     path("files/", include("files.urls", namespace="files")),
-    path("pictures/", include("pictures.urls", namespace="pictures")),
-    path("videos/", include("videos.urls", namespace="videos")),
-    path("audios/", include("audios.urls", namespace="audios")),
-    path("documents/", include("documents.urls", namespace="documents")),
     path("api/csrf/", csrfview),
+    path("widgets/", include("widgets.urls", namespace="widgets")),
 ]
 
 # we are serving media files through nginx using X-Accel-Redirect in prod,

@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "oauth2_provider",
     "guardian",
+    "corsheaders",
     # bma apps
     "bornhack_allauth_provider",
     "users",
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     "documents",
     "frontpage",
     "albums",
+    "widgets",
 ]
 
 MIDDLEWARE = [
@@ -57,6 +59,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "oauth2_provider.middleware.OAuth2TokenMiddleware",
     "utils.middleware.RequestContextVarMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "utils.middleware.ExemptOauthFromCSRFMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
