@@ -1,22 +1,13 @@
 from django.contrib import admin
+from files.admin import BaseFileAdmin
+from guardian.shortcuts import get_objects_for_user
 
 from .models import Video
 
 
 @admin.register(Video)
-class VideoAdmin(admin.ModelAdmin):
-    list_display = [
-        "uuid",
-        "owner",
-        "created",
-        "updated",
-        "title",
-        "description",
-        "source",
-        "license",
-        "attribution",
-        "status",
-        "original_filename",
-        "original",
-    ]
-    list_filter = ["tags"]
+class VideoAdmin(BaseFileAdmin):
+    def get_queryset(self, request):
+        if request.user.is_superuser:
+            return super().get_queryset()
+        return get_objects_for_user(request.user, "view_basefile", klass=Video)

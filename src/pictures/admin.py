@@ -1,29 +1,12 @@
 from django.contrib import admin
-
+from files.admin import BaseFileAdmin
 from .models import Picture
+from guardian.shortcuts import get_objects_for_user
 
 
 @admin.register(Picture)
-class PictureAdmin(admin.ModelAdmin):
-    list_display = [
-        "uuid",
-        "owner",
-        "created",
-        "updated",
-        "title",
-        "description",
-        "source",
-        "license",
-        "attribution",
-        "status",
-        "original_filename",
-        "original",
-        "small_thumbnail",
-        "medium_thumbnail",
-        "large_thumbnail",
-        "small",
-        "medium",
-        "large",
-        "slideshow",
-    ]
-    list_filter = ["tags"]
+class PictureAdmin(BaseFileAdmin):
+    def get_queryset(self, request):
+        if request.user.is_superuser:
+            return super().get_queryset()
+        return get_objects_for_user(request.user, "view_basefile", klass=Picture)

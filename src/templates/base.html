@@ -89,13 +89,8 @@
                       File manager
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                      <li><a class="dropdown-item" href="{% url 'admin:index' %}">Manage</a></li>
                       <li><a class="dropdown-item" href="{% url 'files:upload' %}">Upload</a></li>
-                      <li><a class="dropdown-item" href="{% url 'files:manage' %}">Manage</a></li>
-                      <li><hr class="dropdown-divider"></li>
-                      <li><a class="dropdown-item" href="{% url 'pictures:manage' %}">Pictures</a></li>
-                      <li><a class="dropdown-item" href="{% url 'videos:manage' %}">Videos</a></li>
-                      <li><a class="dropdown-item" href="{% url 'audios:manage' %}">Audios</a></li>
-                      <li><a class="dropdown-item" href="{% url 'documents:manage' %}">Documents</a></li>
                     </ul>
                   </li>
                 {% endif %}

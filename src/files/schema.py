@@ -12,7 +12,7 @@ from ninja import ModelSchema
 from ninja import Schema
 
 from .models import FileTypeChoices
-from .models import LicenseChoices
+from .models import LicenseChoices, license_urls
 from .models import StatusChoices
 from files.models import BaseFile, StatusChoices
 from utils.filters import SortingChoices
@@ -45,7 +45,6 @@ class FileUpdateRequestSchema(ModelSchema):
     title: Optional[str] = ""
     description: Optional[str] = ""
     source: Optional[str] = ""
-    license: Optional[str] = ""
     attribution: Optional[str] = ""
     thumbnail_url: Optional[str] = ""
 
@@ -55,15 +54,19 @@ class FileUpdateRequestSchema(ModelSchema):
             "title",
             "description",
             "source",
-            "license",
             "attribution",
             "thumbnail_url",
         ]
 
 
+class SingleFileRequestSchema(Schema):
+    """The schema used for requests involving a single file."""
+    file_uuid: uuid.UUID
+
+
 class MultipleFileRequestSchema(Schema):
-    """The schema used for requests involving multiple files."""
-    files: List[uuid.UUID]
+    """The schema us ed for requests involving multiple files."""
+    file_uuids: List[uuid.UUID]
 
 
 """Response schemas below here."""
@@ -79,6 +82,8 @@ class FileResponseSchema(ModelSchema):
     status_icon: str
     size_bytes: int
     permissions: ObjectPermissionSchema
+    license_name: str
+    license_url: str
 
     class Config:
         model = BaseFile
@@ -89,10 +94,10 @@ class FileResponseSchema(ModelSchema):
             "updated",
             "title",
             "description",
-            "source",
             "license",
             "attribution",
             "status",
+            "source",
             "original_filename",
             "thumbnail_url",
         ]
@@ -114,41 +119,7 @@ class FileResponseSchema(ModelSchema):
 
     @staticmethod
     def resolve_links(obj, context):
-        links = {
-            "self": reverse("api-v1-json:file_get", kwargs={"file_uuid": obj.uuid}),
-            "approve": reverse(
-                "api-v1-json:file_approve",
-                kwargs={"file_uuid": obj.uuid},
-            ),
-            "unpublish": reverse(
-                "api-v1-json:file_unpublish",
-                kwargs={"file_uuid": obj.uuid},
-            ),
-            "publish": reverse(
-                "api-v1-json:file_publish",
-                kwargs={"file_uuid": obj.uuid},
-            ),
-            "downloads": {
-                "original": obj.original.url,
-            },
-        }
-        if obj.filetype == "picture":
-            try:
-                links["downloads"].update(
-                    {
-                        "small_thumbnail": obj.small_thumbnail.url,
-                        "medium_thumbnail": obj.medium_thumbnail.url,
-                        "large_thumbnail": obj.large_thumbnail.url,
-                        "small": obj.small.url,
-                        "medium": obj.medium.url,
-                        "large": obj.large.url,
-                        "slideshow": obj.slideshow.url,
-                    },
-                )
-            except OSError:
-                # maybe file is missing from disk
-                pass
-        return links
+        return obj.resolve_links(request=context["request"])
 
     @staticmethod
     def resolve_status(obj, context):
@@ -157,6 +128,19 @@ class FileResponseSchema(ModelSchema):
     @staticmethod
     def resolve_permissions(obj, context):
         return get_object_permissions_schema(obj, context["request"])
+
+    @staticmethod
+    def resolve_license_name(obj, context):
+        return getattr(LicenseChoices, obj.license).label
+
+    @staticmethod
+    def resolve_license_url(obj, context):
+        return license_urls[obj.license]
+
+    @staticmethod
+    def resolve_source(obj, context):
+        """Consider the BMA canonical URL the source if no other source has been specified."""
+        return obj.source if obj.source else obj.get_absolute_url()
 
 
 class SingleFileResponseSchema(ApiResponseSchema):
