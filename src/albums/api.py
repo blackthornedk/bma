@@ -2,19 +2,22 @@ import logging
 import operator
 import uuid
 from functools import reduce
-from typing import List
 
 from django.db.models import Q
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from guardian.shortcuts import assign_perm
 from ninja import Query
 from ninja import Router
-
-from .models import Album
-from .filters import AlbumFilters
-from .schema import AlbumRequestSchema
-from .schema import SingleAlbumResponseSchema, MultipleAlbumResponseSchema
+from utils.api import wrap_response
 from utils.schema import ApiMessageSchema
+from utils.schema import ApiResponseSchema
+
+from .filters import AlbumFilters
+from .models import Album
+from .schema import AlbumRequestSchema
+from .schema import MultipleAlbumResponseSchema
+from .schema import SingleAlbumResponseSchema
 
 logger = logging.getLogger("bma")
 
@@ -22,7 +25,7 @@ logger = logging.getLogger("bma")
 router = Router()
 
 # https://django-ninja.rest-framework.com/guides/input/query-params/#using-schema
-query = Query(...)
+query = Query(...)  # type: ignore
 
 
 @router.post(
@@ -30,7 +33,7 @@ query = Query(...)
     response={201: SingleAlbumResponseSchema},
     summary="Create a new album",
 )
-def album_create(request, payload: AlbumRequestSchema):
+def album_create(request: HttpRequest, payload: AlbumRequestSchema) -> tuple[int, ApiResponseSchema]:
     """Use this endpoint to create a new album, with or without files."""
     album = Album()
     for k, v in payload.dict().items():
@@ -38,7 +41,7 @@ def album_create(request, payload: AlbumRequestSchema):
             album.files.set(v)
         else:
             setattr(album, k, v)
-    album.owner = request.user
+    album.owner = request.user  # type: ignore
     album.save()
 
     # assign permissions
@@ -46,7 +49,7 @@ def album_create(request, payload: AlbumRequestSchema):
     assign_perm("delete_album", request.user, album)
 
     # return response
-    return 201, {"bma_response": album}
+    return 200, wrap_response(album)
 
 
 @router.get(
@@ -55,10 +58,10 @@ def album_create(request, payload: AlbumRequestSchema):
     summary="Return an album.",
     auth=None,
 )
-def album_get(request, album_uuid: uuid.UUID):
+def album_get(request: HttpRequest, album_uuid: uuid.UUID) -> tuple[int, ApiResponseSchema]:
     """Return an album."""
     album = get_object_or_404(Album, uuid=album_uuid)
-    return 200, {"bma_response": album}
+    return 200, wrap_response(album)
 
 
 @router.get(
@@ -67,7 +70,7 @@ def album_get(request, album_uuid: uuid.UUID):
     summary="Return a list of albums.",
     auth=None,
 )
-def album_list(request, filters: AlbumFilters = query):
+def album_list(request: HttpRequest, filters: AlbumFilters = query) -> tuple[int, ApiResponseSchema]:
     """Return a list of albums."""
     albums = Album.objects.all()
 
@@ -95,7 +98,7 @@ def album_list(request, filters: AlbumFilters = query):
     if filters.limit:
         albums = albums[: filters.limit]
 
-    return 200, {"bma_response": albums}
+    return 200, wrap_response(albums)
 
 
 @router.put(
@@ -121,19 +124,19 @@ def album_list(request, filters: AlbumFilters = query):
     summary="Update an album.",
 )
 def album_update(
-    request,
+    request: HttpRequest,
     album_uuid: uuid.UUID,
     payload: AlbumRequestSchema,
-    check: bool = None,
-):
+    check: bool = False,
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Update (PATCH) or replace (PUT) an Album."""
     album = get_object_or_404(Album, uuid=album_uuid)
     if not request.user.has_perm("change_album", album):
         # no permission
-        return 403, {"message": "Permission denied."}
+        return 403, ApiMessageSchema(message="Permission denied.")
     if check:
         # check mode requested, don't change anything
-        return 202, {"message": "OK"}
+        return 202, ApiMessageSchema(message="OK")
     if request.method == "PATCH":
         # we are updating the object, we do not want defaults for absent fields
         data = payload.dict(exclude_unset=True)
@@ -152,7 +155,7 @@ def album_update(
         album.save()
     if "files" in payload.dict():
         album.files.set(payload.dict()["files"])
-    return 200, {"bma_response": album}
+    return 200, wrap_response(album)
 
 
 @router.delete(
@@ -160,13 +163,15 @@ def album_update(
     response={202: ApiMessageSchema, 204: None, 403: ApiMessageSchema, 404: ApiMessageSchema},
     summary="Delete an album.",
 )
-def album_delete(request, album_uuid: uuid.UUID, check: bool = None):
+def album_delete(
+    request: HttpRequest, album_uuid: uuid.UUID, check: bool = False
+) -> tuple[int, ApiMessageSchema | None]:
     album = get_object_or_404(Album, uuid=album_uuid)
     if not request.user.has_perm("delete_album", album):
         # no permission
-        return 403, {"message": "Permission denied."}
+        return 403, ApiMessageSchema(message="Permission denied.")
     if check:
         # check mode requested, don't change anything
-        return 202, {"message": "OK"}
+        return 202, ApiMessageSchema(message="OK")
     album.delete()
     return 204, None

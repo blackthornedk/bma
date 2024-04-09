@@ -1,47 +1,58 @@
-from django.db import models
-from ninja import Schema, ModelSchema
-from typing import Union, Optional, Any, List
+"""API schemas used across multiple apps."""
 import datetime
+import logging
+from typing import Any
+
+from django.http import HttpRequest
 from django.utils import timezone
-from .request import context_request
+from ninja import Schema
+
+logger = logging.getLogger("bma")
+
 
 class RequestMetadataSchema(Schema):
     """The schema used for the request object in the root of all responses."""
+
     request_time: datetime.datetime
-    username: Optional[str]
-    client_ip: Optional[str]
+    username: str
+    client_ip: str
 
     @staticmethod
-    def resolve_request_time(obj, context):
-        return datetime.datetime.now()
+    def resolve_request_time(obj: dict[str, str]) -> datetime.datetime:
+        """Get the value for the request_time field."""
+        return timezone.now()
 
     @staticmethod
-    def resolve_username(obj, context):
-        print("inside resolve_username")
+    def resolve_username(obj: dict[str, str], context: dict[str, HttpRequest]) -> str:
+        """Get the value for the username field."""
+        logger.debug(f"getting username from obj {obj} and context {context}")
         request = context["request"]
-        return request.user.username
+        return str(request.user.username)
 
     @staticmethod
-    def resolve_client_ip(obj, context):
+    def resolve_client_ip(obj: dict[str, str], context: dict[str, HttpRequest]) -> str:
+        """Get the value for the client_ip field."""
         request = context["request"]
-        return request.META["REMOTE_ADDR"]
+        return str(request.META["REMOTE_ADDR"])
 
 
 class ApiMessageSchema(Schema):
     """The schema used for all API responses which are just messages."""
 
     bma_request: RequestMetadataSchema
-    message: str = None
-    details: dict = None
+    message: str | None = None
+    details: dict[str, str] | None = None
 
 
 class ApiResponseSchema(ApiMessageSchema):
     """The schema used for all API responses which contain a bma_response object."""
-    bma_response: Optional[Any]
+
+    bma_response: Any
 
 
 class ObjectPermissionSchema(Schema):
     """The schema used to include current permissions for objects."""
-    user_permissions: List[str]
-    group_permissions: List[str]
-    effective_permissions: List[str]
+
+    user_permissions: list[str]
+    group_permissions: list[str]
+    effective_permissions: list[str]

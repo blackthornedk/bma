@@ -1,18 +1,15 @@
+"""The album model."""
 import uuid
 
 from django.db import models
-from taggit.managers import TaggableManager
-
 from files.models import BaseFile
+from taggit.managers import TaggableManager
 from users.sentinel import get_sentinel_user
 from utils.models import UUIDTaggedItem
 
 
 class Album(models.Model):
     """The Album model is used to group files (from all users, like a spotify playlist)."""
-
-    class Meta:
-        ordering = ["created"]
 
     uuid = models.UUIDField(
         primary_key=True,
@@ -60,6 +57,15 @@ class Album(models.Model):
         related_name="albums",
     )
 
+    class Meta:
+        """Order by created date initially."""
+
+        ordering = ("created",)
+
+    def __str__(self) -> str:
+        """The string representation of an album."""
+        return f"{self.title} ({self.uuid})"
+
 
 class AlbumMember(models.Model):
     """The through model linking Albums and files."""
@@ -83,3 +89,7 @@ class AlbumMember(models.Model):
         auto_now=True,
         help_text="The date and time when this object was last updated.",
     )
+
+    def __str__(self) -> str:
+        """The string representation of an album member file."""
+        return f"{self.basefile.uuid} is in album {self.album.uuid}"

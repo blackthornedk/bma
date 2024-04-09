@@ -1,52 +1,46 @@
+"""The API of fileness."""
 import logging
-from utils.api import wrap_response
-from django.http import HttpResponse
-from users.models import User
 import uuid
-from typing import List
-from typing import Union
-from typing import Optional
 
 import magic
+from audios.models import Audio
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from guardian.shortcuts import assign_perm, remove_perm
-from guardian.shortcuts import get_objects_for_user, get_objects_for_group
+from documents.models import Document
+from guardian.shortcuts import assign_perm
+from guardian.shortcuts import get_objects_for_user
 from ninja import Query
 from ninja import Router
 from ninja.files import UploadedFile
-
-from .models import BaseFile
-from .filters import FileFilters
-from .schema import SingleFileResponseSchema
-from .schema import MultipleFileResponseSchema
-from .schema import FileTypeChoices
-from .schema import FileUpdateRequestSchema
-from .schema import UploadRequestSchema
-from .schema import MultipleFileRequestSchema
-from audios.models import Audio
-from audios.schema import AudioOutSchema
-from documents.models import Document
-from documents.schema import DocumentOutSchema
 from pictures.models import Picture
-from pictures.schema import PictureOutSchema
+from utils.api import wrap_response
 from utils.schema import ApiMessageSchema
-from .schema import SingleFileResponseSchema, SingleFileRequestSchema
+from utils.schema import ApiResponseSchema
 from videos.models import Video
-from videos.schema import VideoOutSchema
+
+from .filters import FileFilters
+from .models import BaseFile
+from .models import FileTypeChoices
+from .schema import FileUpdateRequestSchema
+from .schema import MultipleFileRequestSchema
+from .schema import MultipleFileResponseSchema
+from .schema import SingleFileRequestSchema
+from .schema import SingleFileResponseSchema
+from .schema import UploadRequestSchema
 
 logger = logging.getLogger("bma")
+
 
 # initialise API router
 router = Router()
 
 # https://django-ninja.rest-framework.com/guides/input/query-params/#using-schema
-query = Query(...)
+query: Query = Query(...)  # type: ignore[type-arg]
 
 
 ############## UPLOAD #########################################################
@@ -59,7 +53,9 @@ query = Query(...)
     },
     summary="Upload a new file.",
 )
-def upload(request, f: UploadedFile, metadata: UploadRequestSchema):
+def upload(
+    request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint for file uploads."""
     # find the filetype using libmagic by reading the first bit of the file
     mime = magic.from_buffer(f.read(512), mime=True)
@@ -73,12 +69,12 @@ def upload(request, f: UploadedFile, metadata: UploadRequestSchema):
     elif mime in settings.ALLOWED_DOCUMENT_TYPES:
         from documents.models import Document as Model
     else:
-        return 422, {"message": "File type not supported"}
+        return 422, ApiMessageSchema(message="File type not supported")
 
     uploaded_file = Model(
-        owner=request.user,
+        owner=request.user,  # type: ignore[misc]
         original=f,
-        original_filename=f.name,
+        original_filename=str(f.name),
         file_size=f.size,
         **metadata.dict(),
     )
@@ -89,14 +85,12 @@ def upload(request, f: UploadedFile, metadata: UploadRequestSchema):
 
     if not uploaded_file.thumbnail_url:
         # thumbnail url was not specified, use the default for the filetype
-        uploaded_file.thumbnail_url = settings.DEFAULT_THUMBNAIL_URLS[
-            uploaded_file.filetype
-        ]
+        uploaded_file.thumbnail_url = settings.DEFAULT_THUMBNAIL_URLS[uploaded_file.filetype]
 
     try:
         uploaded_file.full_clean()
     except ValidationError:
-        return 422, {"message": "Validation error"}
+        return 422, ApiMessageSchema(message="Validation error")
 
     # save everything
     uploaded_file.save()
@@ -127,7 +121,7 @@ def upload(request, f: UploadedFile, metadata: UploadRequestSchema):
     summary="Return a list of metadata for files.",
     auth=None,
 )
-def file_list(request, filters: FileFilters = query):
+def file_list(request: HttpRequest, filters: FileFilters = query) -> tuple[int, ApiResponseSchema]:  # noqa: C901,PLR0912
     """Return a list of metadata for files."""
     # start out with a list of all PUBLISHED files plus whatever else the user has explicit access to
     files = BaseFile.objects.filter(status="PUBLISHED") | get_objects_for_user(
@@ -191,39 +185,52 @@ def file_list(request, filters: FileFilters = query):
     if filters.limit:
         files = files[: filters.limit]
 
-    return wrap_response(list(files))
+    return 200, wrap_response(files)
 
 
 ############## GENERIC FILE ACTION ############################################
-def api_file_action(request, uuids: list[str], permission: str, old_status: str, new_status: str, action: str):
+def api_file_action(  # noqa: PLR0913
+    request: HttpRequest,
+    uuids: list[uuid.UUID],
+    permission: str,
+    old_status: str,
+    action: str,
+    *,
+    check: bool,
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Perform an action on one or more files."""
-    file_filter = dict(
-        uuid__in=[str(u) for u in uuids],
-    )
+    file_filter: dict[str, str | list[str]] = {"uuid__in": [str(u) for u in uuids]}
     if old_status:
         file_filter["status"] = old_status
-    dbfiles = get_objects_for_user(
-        request.user,
-        permission,
-        klass=BaseFile.objects.filter(**file_filter)
-    )
+    dbfiles = get_objects_for_user(request.user, permission, klass=BaseFile.objects.filter(**file_filter))
     if len(uuids) != dbfiles.count():
         errors = len(uuids) - dbfiles.count()
-        return 403, {
-            "message": f"Wrong status/no permission to {action} {errors} of {len(uuids)} files)",
-        }
+        return 403, ApiMessageSchema(message=f"Wrong status/no permission to {action} {errors} of {len(uuids)} files)")
     if check:
-        return 202, {"message": "OK"}
+        return 202, ApiMessageSchema(message="OK")
     updated = getattr(dbfiles, action)()
-    return wrap_response(BaseFile.objects.filter(
-        uuid__in=dbfiles.values_list("uuid", flat=True),
-    ))
+    logger.debug(f"{action} {updated} files")
+    return 200, ApiResponseSchema(
+        bma_request={},
+        bma_response=BaseFile.objects.filter(
+            uuid__in=dbfiles.values_list("uuid", flat=True),
+        ),
+    )
 
 
 ############## APPROVE ########################################################
-def approve(request, uuids):
+def approve(
+    request: HttpRequest, uuids: list[uuid.UUID], *, check: bool
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Approve one or more files by changing the status of a list of files from PENDING_MODERATION to UNPUBLISHED."""
-    return api_file_action(request, uuids, "approve_basefile", old_status="PENDING_MODERATION", new_status="UNPUBLISHED", action="approve")
+    return api_file_action(
+        request,
+        uuids,
+        "approve_basefile",
+        old_status="PENDING_MODERATION",
+        action="approve",
+        check=check,
+    )
 
 
 @router.patch(
@@ -235,9 +242,11 @@ def approve(request, uuids):
     },
     summary="Approve a file (change status from PENDING_MODERATION to UNPUBLISHED).",
 )
-def approve_file(request, file_uuid: SingleFileRequestSchema, check: bool = None):
+def approve_file(
+    request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of a single file from PENDING_MODERATION to UNPUBLISHED."""
-    return approve(request, [file_uuid])
+    return approve(request, [file_uuid.file_uuid], check=check)
 
 
 @router.patch(
@@ -249,16 +258,27 @@ def approve_file(request, file_uuid: SingleFileRequestSchema, check: bool = None
     },
     summary="Approve multiple files (change status from PENDING_MODERATION to UNPUBLISHED).",
 )
-def approve_files(request, payload: MultipleFileRequestSchema, check: bool = None):
+def approve_files(
+    request: HttpRequest, payload: MultipleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of multiple files from PENDING_MODERATION to UNPUBLISHED."""
     uuids = payload.dict()["files"]
-    return approve(request, uuids)
+    return approve(request, uuids, check=check)
 
 
 ############## UNAPPROVE ######################################################
-def unapprove(request, uuids):
+def unapprove(
+    request: HttpRequest, uuids: list[uuid.UUID], *, check: bool
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Unapprove one or more files by changing the status of a list of files to PENDING_MODERATION."""
-    return api_file_action(request, uuids, "unapprove_basefile", old_status="", new_status="PENDING_MODERATION", action="unapprove")
+    return api_file_action(
+        request,
+        uuids,
+        "unapprove_basefile",
+        old_status="",
+        action="unapprove",
+        check=check,
+    )
 
 
 @router.patch(
@@ -270,9 +290,11 @@ def unapprove(request, uuids):
     },
     summary="Unapprove a file (change status to PENDING_MODERATION).",
 )
-def unapprove_file(request, file_uuid: SingleFileRequestSchema, check: bool = None):
+def unapprove_file(
+    request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of a single file to PENDING_MODERATION."""
-    return unapprove(request, [file_uuid])
+    return unapprove(request, [file_uuid.file_uuid], check=check)
 
 
 @router.patch(
@@ -284,16 +306,27 @@ def unapprove_file(request, file_uuid: SingleFileRequestSchema, check: bool = No
     },
     summary="Unapprove multiple files (change status to PENDING_MODERATION).",
 )
-def unapprove_files(request, payload: MultipleFileRequestSchema, check: bool = None):
+def unapprove_files(
+    request: HttpRequest, payload: MultipleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of multiple files to PENDING_MODERATION."""
     uuids = payload.dict()["files"]
-    return unapprove(request, uuids)
+    return unapprove(request, uuids, check=check)
 
 
 ############## PUBLISH ########################################################
-def publish(request, uuids):
+def publish(
+    request: HttpRequest, uuids: list[uuid.UUID], *, check: bool
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Publish a list of files by changing the status from UNPUBLISHED to PUBLISHED."""
-    return api_file_action(request, uuids, "publish_basefile", old_status="UNPUBLISHED", new_status="PUBLISHED", action="publish")
+    return api_file_action(
+        request,
+        uuids,
+        "publish_basefile",
+        old_status="UNPUBLISHED",
+        action="publish",
+        check=check,
+    )
 
 
 @router.patch(
@@ -305,9 +338,11 @@ def publish(request, uuids):
     },
     summary="Publish a file (change status from UNPUBLISHED to PUBLISHED).",
 )
-def publish_file(request, file_uuid: SingleFileRequestSchema, check: bool = None):
+def publish_file(
+    request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of a single file from UNPUBLISHED to PUBLISHED."""
-    return publish(request, [file_uuid])
+    return publish(request, [file_uuid.file_uuid], check=check)
 
 
 @router.patch(
@@ -319,16 +354,27 @@ def publish_file(request, file_uuid: SingleFileRequestSchema, check: bool = None
     },
     summary="Publish multiple files (change status from UNPUBLISHED to PUBLISHED).",
 )
-def publish_files(request, data: MultipleFileRequestSchema, check: bool = None):
+def publish_files(
+    request: HttpRequest, data: MultipleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Change the status of files from UNPUBLISHED to PUBLISHED."""
     files = data.dict()["files"]
-    return publish(request, files)
+    return publish(request, files, check=check)
 
 
 ############## UNPUBLISH ########################################################
-def unpublish(request, uuids):
+def unpublish(
+    request: HttpRequest, uuids: list[uuid.UUID], *, check: bool
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Unpublish a list of files by changing the status from PUBLISHED to UNPUBLISHED."""
-    return api_file_action(request, uuids, "unpublish_basefile", old_status="PUBLISHED", new_status="UNPUBLISHED", action="unpublish")
+    return api_file_action(
+        request,
+        uuids,
+        "unpublish_basefile",
+        old_status="PUBLISHED",
+        action="unpublish",
+        check=check,
+    )
 
 
 @router.patch(
@@ -340,9 +386,11 @@ def unpublish(request, uuids):
     },
     summary="Unpublish a file (change status from PUBLISHED to UNPUBLISHED).",
 )
-def unpublish_file(request, file_uuid: SingleFileRequestSchema, check: bool = None):
+def unpublish_file(
+    request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """API endpoint to change the status of a single file from PUBLISHED to UNPUBLISHED."""
-    return unpublish(request, [file_uuid])
+    return unpublish(request, [file_uuid.file_uuid], check=check)
 
 
 @router.patch(
@@ -354,10 +402,12 @@ def unpublish_file(request, file_uuid: SingleFileRequestSchema, check: bool = No
     },
     summary="Unpublish multiple files (change status from PUBLISHED to UNPUBLISHED).",
 )
-def unpublish_files(request, data: MultipleFileRequestSchema, check: bool = None):
+def unpublish_files(
+    request: HttpRequest, data: MultipleFileRequestSchema, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Change the status of files from PUBLISHED to UNPUBLISHED."""
     files = data.dict()["files"]
-    return unpublish(request, files)
+    return unpublish(request, files, check=check)
 
 
 ############## METADATA #######################################################
@@ -371,7 +421,7 @@ def unpublish_files(request, data: MultipleFileRequestSchema, check: bool = None
     summary="Return the metadata of a file.",
     auth=None,
 )
-def file_get(request, file_uuid: uuid.UUID):
+def file_get(request: HttpRequest, file_uuid: uuid.UUID) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Return a file object."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
     if basefile.status == "PUBLISHED" or request.user.has_perm(
@@ -379,8 +429,7 @@ def file_get(request, file_uuid: uuid.UUID):
         basefile,
     ):
         return 200, wrap_response(basefile)
-    else:
-        return 403, {"message": "Permission denied."}
+    return 403, ApiMessageSchema(message="Permission denied.")
 
 
 @router.put(
@@ -408,18 +457,19 @@ def file_get(request, file_uuid: uuid.UUID):
     summary="Update the metadata of a file.",
 )
 def file_update(
-    request,
+    request: HttpRequest,
     file_uuid: uuid.UUID,
     metadata: FileUpdateRequestSchema,
-    check: bool = None,
-):
+    *,
+    check: bool = False,
+) -> tuple[int, ApiMessageSchema | ApiResponseSchema]:
     """Update (PATCH) or replace (PUT) a file metadata object."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
     if not request.user.has_perm("change_basefile", basefile):
-        return 403, {"message": "Permission denied."}
+        return 403, ApiMessageSchema(message="Permission denied.")
     if check:
         # check mode requested, don't change anything
-        return 202, {"message": "OK"}
+        return 202, ApiMessageSchema(message="OK")
     if request.method == "PATCH":
         try:
             with transaction.atomic():
@@ -430,7 +480,7 @@ def file_update(
                 basefile.refresh_from_db()
                 basefile.full_clean()
         except ValidationError:
-            return 422, {"message": "Validation error"}
+            return 422, ApiMessageSchema(message="Validation error")
     else:
         try:
             with transaction.atomic():
@@ -441,8 +491,8 @@ def file_update(
                 basefile.refresh_from_db()
                 basefile.full_clean()
         except ValidationError:
-            return 422, {"message": "Validation error"}
-    return wrap_response(basefile)
+            return 422, ApiMessageSchema(message="Validation error")
+    return 200, wrap_response(basefile)
 
 
 ############## DELETE #########################################################
@@ -456,17 +506,17 @@ def file_update(
     },
     summary="Delete a file (change status to PENDING_DELETION).",
 )
-def file_delete(request, file_uuid: uuid.UUID, check: bool = None):
+def file_delete(
+    request: HttpRequest, file_uuid: uuid.UUID, *, check: bool = False
+) -> tuple[int, ApiMessageSchema | None]:
     """Mark a file for deletion."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
     if not request.user.has_perm("delete_basefile", basefile):
-        return 403, {"message": "Permission denied."}
+        return 403, ApiMessageSchema(message="Permission denied.")
     if check:
         # check mode requested, don't change anything
-        return 202, {"message": "OK"}
-    else:
-        # we don't let users fully delete files for now
-        # basefile.delete()
-        basefile.status = "PENDING_DELETION"
-        basefile.save()
-        return 204, None
+        return 202, ApiMessageSchema(message="OK")
+    # ok go but we don't let users fully delete files for now
+    basefile.status = "PENDING_DELETION"
+    basefile.save()
+    return 204, None

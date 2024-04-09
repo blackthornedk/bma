@@ -1,12 +1,12 @@
+"""The Document model."""
 from django.db import models
-from taggit.managers import TaggableManager
-
 from files.models import BaseFile
+from taggit.managers import TaggableManager
 from utils.models import UUIDTaggedItem
 from utils.upload import get_upload_path
 
 
-class Document(BaseFile):
+class Document(BaseFile):  # type: ignore[django-manager-missing]
     """The Document model."""
 
     original = models.FileField(

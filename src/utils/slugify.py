@@ -1,10 +1,13 @@
+"""A numbered slugifyer which skips existing slugs."""
 from django.utils.text import slugify
 
 
-def unique_slugify(text: str, slugs_in_use: list):
+def unique_slugify(text: str, slugs_in_use: list[str]) -> str:
     """Use Djangos slugify and append a number if the result is in use.
+
     Unslugable values raise an exception. Conflict handling starts the
     numbering at 2.
+
     Args:
         text: The input to be slugified
         slugs_in_use: A list of strings to be checked for conflicts
@@ -15,7 +18,7 @@ def unique_slugify(text: str, slugs_in_use: list):
     """
     slug = slugify(text)
     if not slug:
-        raise ValueError("Unable to slugify input")
+        raise ValueError("Unslugifyable")
     if slug in slugs_in_use:
         i = 2
         slug = f"{slug}-{i}"

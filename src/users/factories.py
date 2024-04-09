@@ -1,3 +1,4 @@
+"""Factory used in unit tests."""
 import factory
 
 from .models import User

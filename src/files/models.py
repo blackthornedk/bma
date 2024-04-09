@@ -1,17 +1,17 @@
-from guardian.shortcuts import assign_perm, remove_perm
+"""This file contains the main BMA model BaseFile and related classes."""
+import contextlib
 import uuid
-from django.utils import timezone
-from django.db.models.manager import BaseManager
-from django.utils.html import mark_safe
 
-from django.urls import reverse
 from django.conf import settings
 from django.db import models
-from polymorphic.models import PolymorphicModel, PolymorphicManager
+from django.http import HttpRequest
+from django.urls import reverse
 from polymorphic.managers import PolymorphicQuerySet
+from polymorphic.models import PolymorphicManager
+from polymorphic.models import PolymorphicModel
+from users.sentinel import get_sentinel_user
 
 from .validators import validate_thumbnail_url
-from users.sentinel import get_sentinel_user
 
 
 class StatusChoices(models.TextChoices):
@@ -50,31 +50,31 @@ class FileTypeChoices(models.TextChoices):
     document = ("document", "Document")
 
 
-
 class BaseFileQuerySet(PolymorphicQuerySet):
     """Custom queryset and manager for file operations."""
-    def approve(self):
+
+    def approve(self) -> int:
         """Approve files in queryset."""
         updated = 0
         for basefile in self:
             updated += basefile.approve()
         return updated
 
-    def unapprove(self):
+    def unapprove(self) -> int:
         """Unapprove files in queryset."""
         updated = 0
         for basefile in self:
             updated += basefile.unapprove()
         return updated
 
-    def publish(self):
+    def publish(self) -> int:
         """Publish files in queryset."""
         updated = 0
         for basefile in self:
             updated += basefile.publish()
         return updated
 
-    def unpublish(self):
+    def unpublish(self) -> int:
         """Unpublish files in queryset."""
         updated = 0
         for basefile in self:
@@ -86,7 +86,9 @@ class BaseFile(PolymorphicModel):
     """The polymorphic base model inherited by the Picture, Video, Audio, and Document models."""
 
     class Meta:
-        ordering = ["created"]
+        """Define custom permissions for the BaseFile and inherited models."""
+
+        ordering = ("created",)
         permissions = (
             ("unapprove_basefile", "Unapprove file"),
             ("approve_basefile", "Approve file"),
@@ -132,7 +134,8 @@ class BaseFile(PolymorphicModel):
     )
 
     source = models.URLField(
-        help_text="The URL to the original source of this work. Leave blank to consider the BMA URL the original source.",
+        help_text="The URL to the original source of this work. "
+        "Leave blank to consider the BMA URL the original source.",
         blank=True,
     )
 
@@ -145,7 +148,8 @@ class BaseFile(PolymorphicModel):
 
     attribution = models.CharField(
         max_length=255,
-        help_text="The attribution text for this file. This is usually the real name or handle of the author(s) or licensor of the file.",
+        help_text="The attribution text for this file. "
+        "This is usually the real name or handle of the author(s) or licensor of the file.",
     )
 
     status = models.CharField(
@@ -168,31 +172,39 @@ class BaseFile(PolymorphicModel):
     thumbnail_url = models.CharField(
         max_length=255,
         validators=[validate_thumbnail_url],
-        help_text="Relative URL to the image to use as thumbnail for this file. This must be a string beginning with /static/images/ or /media/",
+        help_text="Relative URL to the image to use as thumbnail for this file. "
+        "This must be a string beginning with /static/images/ or /media/",
     )
 
     @property
-    def filetype(self):
-        return self._meta.model_name
+    def filetype(self) -> str:
+        """The filetype."""
+        return str(self._meta.model_name)
 
     @property
-    def filetype_icon(self):
+    def filetype_icon(self) -> str:
+        """The filetype icon."""
         return settings.FILETYPE_ICONS[self.filetype]
 
     @property
-    def status_icon(self):
+    def status_icon(self) -> str:
+        """Status icon."""
         return settings.FILESTATUS_ICONS[self.status]
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
+        """The detail url for the file."""
         return reverse("files:detail", kwargs={"pk": self.pk})
 
-    def resolve_links(self, request=None):
-        """Return a dict of links for various actions on this object. Only return actions the current user has permission to do."""
-        links = {
+    def resolve_links(self, request: HttpRequest | None = None) -> dict[str, str | dict[str, str]]:
+        """Return a dict of links for various actions on this object.
+
+        Only return the actions the current user has permission to do.
+        """
+        links: dict[str, str | dict[str, str]] = {
             "self": reverse("api-v1-json:file_get", kwargs={"file_uuid": self.uuid}),
-            "downloads": {
-                "original": self.original.url,
-            },
+        }
+        downloads: dict[str, str] = {
+            "original": self.original.url,
         }
         if request:
             if request.user.has_perm("approve_basefile", self):
@@ -204,20 +216,21 @@ class BaseFile(PolymorphicModel):
                 links["unapprove"] = reverse(
                     "api-v1-json:unapprove_file",
                     kwargs={"file_uuid": self.uuid},
-                ),
+                )
             if request.user.has_perm("publish_basefile", self):
                 links["publish"] = reverse(
                     "api-v1-json:publish_file",
                     kwargs={"file_uuid": self.uuid},
-                ),
+                )
             if request.user.has_perm("unpublish_basefile", self):
                 links["unpublish"] = reverse(
                     "api-v1-json:unpublish_file",
                     kwargs={"file_uuid": self.uuid},
-                ),
+                )
         if self.filetype == "picture":
-            try:
-                links["downloads"].update(
+            # maybe file is missing from disk so suppress OSError
+            with contextlib.suppress(OSError):
+                downloads.update(
                     {
                         "small_thumbnail": self.small_thumbnail.url,
                         "medium_thumbnail": self.medium_thumbnail.url,
@@ -226,33 +239,7 @@ class BaseFile(PolymorphicModel):
                         "medium": self.medium.url,
                         "large": self.large.url,
                         "slideshow": self.slideshow.url,
-                    },
+                    }
                 )
-            except OSError:
-                # maybe file is missing from disk
-                pass
+        links["downloads"] = downloads
         return links
-
-    def approve(self, check: bool = False):
-        """Approve file (change status to UNPUBLISHED)."""
-        updated = BaseFile.objects.filter(uuid=self.uuid).update(
-            status="UNPUBLISHED",
-            updated=timezone.now(),
-        )
-        if updated:
-            print(f"approve() assigning permissions, updated is {updated}")
-            assign_perm("publish_basefile", self.owner, self)
-            assign_perm("unpublish_basefile", self.owner, self)
-        return updated
-
-    def unapprove(self, check: bool = False):
-        """Unapprove file (change status to PENDING_MODERATION)."""
-        updated = BaseFile.objects.filter(uuid=self.uuid).update(
-            status="PENDING_MODERATION",
-            updated=timezone.now(),
-        )
-        if updated:
-            print(f"unapprove() assigning permissions, updated is {updated}")
-            remove_perm("publish_basefile", self.owner, self)
-            remove_perm("unpublish_basefile", self.owner, self)
-        return updated

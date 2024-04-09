@@ -4,10 +4,10 @@ from django.contrib import admin
 from django.urls import include
 from django.urls import path
 from django.urls import re_path
-
-from .api import api_v1_json
 from files.views import bma_media_view
 from utils.views import csrfview
+
+from .api import api_v1_json
 
 urlpatterns = [
     path("admin/", admin.site.urls),

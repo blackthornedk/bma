@@ -1,10 +1,13 @@
+"""The custom User model used in the BMA project."""
 import uuid
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
-class User(AbstractUser):
+class User(AbstractUser):  # type: ignore[django-manager-missing]
+    """The custom User model used in the BMA project."""
+
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     public_credit_name = models.CharField(
         max_length=100,

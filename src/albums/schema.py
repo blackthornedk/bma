@@ -1,13 +1,12 @@
+"""Schemas for album API calls."""
 import uuid
-from typing import List
 
+from django.http import HttpRequest
 from django.urls import reverse
-from ninja import Field
 from ninja import ModelSchema
-from ninja import Schema
+from utils.schema import ApiResponseSchema
 
 from albums.models import Album
-from utils.schema import ApiMessageSchema, ApiResponseSchema, ObjectPermissionSchema
 
 
 class AlbumRequestSchema(ModelSchema):
@@ -15,11 +14,13 @@ class AlbumRequestSchema(ModelSchema):
 
     title: str = ""
     description: str = ""
-    files: List[uuid.UUID] = []
+    files: list[uuid.UUID]
 
     class Config:
+        """Set model and fields."""
+
         model = Album
-        model_fields = ["title", "description", "files"]
+        model_fields = ("title", "description", "files")
 
 
 """Response schemas below here."""
@@ -28,11 +29,13 @@ class AlbumRequestSchema(ModelSchema):
 class AlbumResponseSchema(ModelSchema):
     """Schema for outputting Albums in API operations."""
 
-    links: dict
+    links: dict[str, str | dict[str, str]]
 
     class Config:
+        """Set model and fields."""
+
         model = Album
-        model_fields = [
+        model_fields = (
             "uuid",
             "owner",
             "created",
@@ -40,10 +43,11 @@ class AlbumResponseSchema(ModelSchema):
             "title",
             "description",
             "files",
-        ]
+        )
 
     @staticmethod
-    def resolve_links(obj, context):
+    def resolve_links(obj: Album, context: dict[str, HttpRequest]) -> dict[str, str | dict[str, str]]:
+        """For now only a self link for albums."""
         return {
             "self": reverse("api-v1-json:album_get", kwargs={"album_uuid": obj.uuid}),
         }
@@ -51,9 +55,11 @@ class AlbumResponseSchema(ModelSchema):
 
 class SingleAlbumResponseSchema(ApiResponseSchema):
     """The schema used to return a response with a single album object."""
+
     bma_response: AlbumResponseSchema
 
 
 class MultipleAlbumResponseSchema(ApiResponseSchema):
     """The schema used to return a response with multiple album objects."""
-    bma_response: List[AlbumResponseSchema]
+
+    bma_response: list[AlbumResponseSchema]

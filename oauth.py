@@ -34,15 +34,10 @@ csrf = s.post(
         "password": password,
     },
 )
-code_verifier = "".join(
-    random.choice(string.ascii_uppercase + string.digits)
-    for _ in range(random.randint(43, 128))
-)
-code_verifier = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
-code_challenge = hashlib.sha256(code_verifier).digest()
-code_challenge = (
-    base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
-)
+code_verifier = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(random.randint(43, 128)))
+code_verifier_base64 = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
+code_challenge = hashlib.sha256(code_verifier_base64).digest()
+code_challenge_base64 = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
 state = "".join(random.choice(string.ascii_letters) for i in range(15))
 
 data = {
@@ -51,7 +46,7 @@ data = {
     "state": state,
     "redirect_uri": "https://example.com/redirect/",
     "response_type": "code",
-    "code_challenge": code_challenge,
+    "code_challenge": code_challenge_base64,
     "code_challenge_method": "S256",
     "nonce": "",
     "claims": "",
@@ -71,7 +66,7 @@ token = s.post(
         "code": authcode,
         "redirect_uri": "https://example.com/redirect/",
         "client_id": client_id,
-        "code_verifier": code_verifier,
+        "code_verifier": code_verifier_base64,
     },
 )
 print(token.json())

@@ -1,5 +1,4 @@
-"""
-ASGI config for bma project.
+"""ASGI config for bma project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

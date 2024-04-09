@@ -1,3 +1,4 @@
+"""Unit tests base class."""
 import base64
 import hashlib
 import json
@@ -14,7 +15,6 @@ from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
 from oauth2_provider.models import get_application_model
 from oauth2_provider.models import get_grant_model
-
 from users.factories import UserFactory
 
 Application = get_application_model()
@@ -26,12 +26,12 @@ class ApiTestBase(TestCase):
     """The base class used by all api tests."""
 
     @classmethod
-    def setUpTestData(cls):
+    def setUpTestData(cls) -> None:
         """Test setup."""
         # disable logging
         logging.disable(logging.CRITICAL)
 
-        # TODO figure out why using ORJSONRenderer() doesn't work
+        # TODO(tykling): figure out why using ORJSONRenderer() doesn't work
         # cls.client = Client(enforce_csrf_checks=True, json_encoder=ORJSONRenderer())
         cls.client = Client(enforce_csrf_checks=True)
 
@@ -65,17 +65,13 @@ class ApiTestBase(TestCase):
     @classmethod
     def get_access_token(cls, user):
         """Test the full oauth2 public client authorization code pkce token flow."""
-
         # prepare to get access token
         code_verifier = "".join(
-            random.choice(string.ascii_uppercase + string.digits)
-            for _ in range(random.randint(43, 128))
+            random.choice(string.ascii_uppercase + string.digits) for _ in range(random.randint(43, 128))
         )
         code_verifier = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
         code_challenge = hashlib.sha256(code_verifier).digest()
-        code_challenge = (
-            base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
-        )
+        code_challenge = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
 
         # this requires login
         cls.client.force_login(user)
@@ -145,7 +141,7 @@ class ApiTestBase(TestCase):
             )
         assert response.status_code == expect_status_code
         if expect_status_code == 422:
-            return
+            return None
         data = response.json()
         assert "uuid" in data
         if not title:

@@ -1,64 +1,43 @@
+---
 default_language_version:
-  python: python3
-exclude: ^.*\b(migrations)\b.*$
+  python: "python3"
+exclude: "^.*\b(migrations)\b.*$"
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.3.0
+  - repo: "https://github.com/adamchainz/django-upgrade"
+    rev: "1.16.0"
     hooks:
-      - id: check-ast
-      - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: detect-private-key
-      - id: check-added-large-files
-      - id: check-json
-      - id: check-symlinks
-      - id: check-toml
-      - id: end-of-file-fixer
-      - id: trailing-whitespace
-      - id: mixed-line-ending
-        args: [--fix=lf]
-  - repo: https://github.com/asottile/reorder_python_imports
-    rev: v3.8.2
+      - id: "django-upgrade"
+        args: ['--target-version', '5.0']
+  - repo: "https://github.com/astral-sh/ruff-pre-commit"
+    rev: "v0.2.2"
     hooks:
-      - id: reorder-python-imports
-        args:
-          - --py3-plus
-          - --application-directories=.:src
-        exclude: migrations/
-  - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: v1.9.0
+      - id: "ruff"
+        args: ["--fix"]
+      - id: "ruff-format"
+  - repo: "https://github.com/pre-commit/mirrors-mypy"
+    rev: 'v1.1.1'
     hooks:
-      - id: python-check-blanket-noqa
-      - id: python-check-mock-methods
-      - id: python-no-eval
-      - id: python-no-log-warn
-      - id: rst-backticks
-  - repo: https://github.com/asottile/add-trailing-comma
-    rev: v2.2.3
-    hooks:
-      -   id: add-trailing-comma
-  - repo: https://github.com/hadialqattan/pycln
-    rev: v2.1.1
-    hooks:
-      -   id: pycln
-  - repo: https://github.com/psf/black
-    rev: 22.8.0
-    hooks:
-      - id: black
-  - repo: https://github.com/pycqa/flake8
-    rev: 5.0.4
-    hooks:
-      - id: flake8
+      - id: "mypy"
+        exclude: "src/.*/tests.py"
         additional_dependencies:
-          - flake8-bugbear
-          - flake8-comprehensions
-          - flake8-tidy-imports
-  - repo: https://github.com/rtts/djhtml
-    rev: 'v1.5.2'  # replace with the latest tag on GitHub
-    hooks:
-      - id: djhtml
-        args: ["-t", "2"]
-      - id: djcss
-        exclude: static_src/css/vendor/.*
-      - id: djjs
-        exclude: static_src/js/vendor/.*
+          - "django-stubs[compatible-mypy]"
+          - "django-stubs-ext"
+          - "types-requests"
+          - "dealer==2.1.0"
+          - "django-allauth==0.61.1"
+          - "django-bootstrap5==23.4"
+          - "django-cors-headers==4.3.1"
+          - "django-guardian==2.4.0"
+          - "django-htmx==1.17.3"
+          - "django-imagekit==5.0.0"
+          - "django-ninja==1.1.0"
+          - "django-oauth-toolkit==2.3.0"
+          - "django-polymorphic==3.1.0"
+          - "django-taggit==5.0.1"
+          - "environs[django]==11.0.0"
+          - "fontawesomefree==6.5.1"
+          - "orjson==3.9.15"
+          - "Pillow==10.2.0"
+          - "psycopg2-binary==2.9.9"
+          - "python-magic==0.4.27"
+...

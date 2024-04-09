@@ -1,12 +1,12 @@
+"""The Audio model."""
 from django.db import models
-from taggit.managers import TaggableManager
-
 from files.models import BaseFile
+from taggit.managers import TaggableManager
 from utils.models import UUIDTaggedItem
 from utils.upload import get_upload_path
 
 
-class Audio(BaseFile):
+class Audio(BaseFile):  # type: ignore[django-manager-missing]
     """The Audio model."""
 
     original = models.FileField(

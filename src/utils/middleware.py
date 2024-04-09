@@ -1,22 +1,35 @@
+"""BMA custom middlewares."""
+from collections.abc import Callable
+from typing import Any
+
+from django.http import HttpRequest
+from django.http import HttpResponse
 from ninja.operation import PathView
-from .request import context_request
+
 
 class ExemptOauthFromCSRFMiddleware:
     """This middleware disables CSRF auth for non-session authed requests for Ninja views.
-    We only want (need) CSRF enabled if the request session-cookie authed.
-    This is needed because django-ninja does not support enabling/disabling CSRF based on auth type.
+
+    We only want (need) CSRF enabled if the request is session-cookie authed.
+    This is middleware needed because django-ninja does not support enabling/disabling CSRF based on auth type.
     https://github.com/vitalik/django-ninja/issues/283
     """
 
-    def __init__(self, get_response):
-        """Boilerplate."""
+    def __init__(self, get_response: Callable[[HttpRequest], None]) -> None:
+        """Custom middleware boilerplate."""
         self.get_response = get_response
 
-    def __call__(self, request):
-        """Boilerplate."""
+    def __call__(self, request: HttpRequest) -> HttpResponse | None:
+        """Custom middleware boilerplate."""
         return self.get_response(request)
 
-    def process_view(self, request, view_func, view_args, view_kwargs):
+    def process_view(
+        self,
+        request: HttpRequest,
+        view_func: Callable[..., HttpRequest],
+        view_args: tuple[Any],
+        view_kwargs: dict[str, Any],
+    ) -> None:
         """Disable CSRF auth for non-cookie authenticated requests to Ninja."""
         # skip if user is session authenticated,
         # meaning any cookie auth requests will require csrf
@@ -35,20 +48,4 @@ class ExemptOauthFromCSRFMiddleware:
         # make sure view class is Ninjas PathView
         if isinstance(klass, PathView):
             # disable CSRF check for this request
-            request._dont_enforce_csrf_checks = True
-
-
-class RequestContextVarMiddleware:
-    """This middleware saves the current request object in a ContextVar so it can be accessed from anywhere."""
-
-    def __init__(self, get_response):
-        """Boilerplate."""
-        self.get_response = get_response
-
-    def __call__(self, request):
-        """Boilerplate."""
-        return self.get_response(request)
-
-    def process_view(self, request, view_func, view_args, view_kwargs):
-        """Save the current request in the context_request ContextVar."""
-        context_request.set(request)
+            request._dont_enforce_csrf_checks = True  # type: ignore[attr-defined] # noqa: SLF001

@@ -1,3 +1,4 @@
+"""The shared filters used in the files and albums API endpoints."""
 from django.db import models
 from ninja import Schema
 
@@ -19,6 +20,6 @@ class ListFilters(Schema):
     """Filters shared between the file_list and album_list endpoints."""
 
     limit: int = 100
-    offset: int = None
-    search: str = None
-    sorting: SortingChoices = None
+    offset: int | None = None
+    search: str | None = None
+    sorting: SortingChoices | None = None

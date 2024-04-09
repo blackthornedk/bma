@@ -1,25 +1,27 @@
+"""The BornHackSocialAccountAdapter takes care of populating fields in the BMA User model from the BornHack profile."""
 from allauth.account.utils import user_field
 from allauth.account.utils import user_username
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from allauth.socialaccount.models import SocialLogin
+from django.http import HttpRequest
 
 
 class BornHackSocialAccountAdapter(DefaultSocialAccountAdapter):
-    def is_open_for_signup(self, request, socialaccount):
+    """The allauth SocialAccountAdapter for BornHack populates the BMA User with data from the BornHack profile."""
+
+    def is_open_for_signup(self, request: HttpRequest, sociallogin: SocialLogin) -> bool:
+        """Always open for business."""
         return True
 
-    def populate_user(self, request, sociallogin, data):
-        """Custom populate_user() method to save our extra fields."""
-        user = sociallogin.user
+    def populate_user(self, request: HttpRequest, sociallogin: SocialLogin, data: dict[str, str]):  # type: ignore[no-untyped-def] # noqa: ANN201
+        """Custom populate_user method to save our extra fields from the BornHack profile."""
+        # set username on the user object
+        user_username(sociallogin.user, data.get("username"))
 
-        # get username
-        username = data.get("username")
-        user_username(user, username or "")
+        # set public_credit_name on the user object
+        user_field(sociallogin.user, "public_credit_name", data.get("public_credit_name"))
 
-        # get public_credit_name
-        public_credit_name = data.get("public_credit_name")
-        user_field(user, "public_credit_name", public_credit_name)
+        # set description on the user object
+        user_field(sociallogin.user, "description", data.get("description"))
 
-        # get description
-        description = data.get("description")
-        user_field(user, "description", description)
-        return user
+        return sociallogin.user

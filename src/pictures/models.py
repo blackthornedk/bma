@@ -1,14 +1,14 @@
+"""The Picture model."""
 from django.db import models
+from files.models import BaseFile
 from imagekit.models import ImageSpecField
 from imagekit.processors import ResizeToFit
 from taggit.managers import TaggableManager
-
-from files.models import BaseFile
 from utils.models import UUIDTaggedItem
 from utils.upload import get_upload_path
 
 
-class Picture(BaseFile):
+class Picture(BaseFile):  # type: ignore[django-manager-missing]
     """The Picture model."""
 
     original = models.ImageField(
