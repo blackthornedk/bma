@@ -11,7 +11,7 @@ Then call this script with <hostname> <username> <password> <client_id>
 """
 import base64
 import hashlib
-import random
+import secrets
 import string
 import sys
 from urllib.parse import parse_qs
@@ -34,11 +34,12 @@ csrf = s.post(
         "password": password,
     },
 )
-code_verifier = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(random.randint(43, 128)))
+alphabet = string.ascii_uppercase + string.digits
+code_verifier = "".join(secrets.choice(alphabet) for i in range(43 + secrets.randbelow(86)))
 code_verifier_base64 = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
 code_challenge = hashlib.sha256(code_verifier_base64).digest()
 code_challenge_base64 = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
-state = "".join(random.choice(string.ascii_letters) for i in range(15))
+state = "".join(secrets.choice(alphabet) for i in range(15))
 
 data = {
     "csrfmiddlewaretoken": csrf.text.strip(),
@@ -57,7 +58,7 @@ auth = s.post(host + "/o/authorize/", allow_redirects=False, data=data)
 url = auth.headers["Location"]
 result = urlparse(url)
 qs = parse_qs(result.query)
-assert state == qs["state"][0]
+assert state == qs["state"][0]  # noqa: S101
 authcode = qs["code"][0]
 token = s.post(
     host + "/o/token/",
@@ -69,4 +70,4 @@ token = s.post(
         "code_verifier": code_verifier_base64,
     },
 )
-print(token.json())
+print(token.json())  # noqa: T201

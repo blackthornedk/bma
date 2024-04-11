@@ -8,12 +8,12 @@ from .models import Album
 class AlbumAdmin(admin.ModelAdmin[Album]):
     """ModelAdmin for the Album model."""
 
-    list_display = [
+    list_display = (
         "uuid",
         "owner",
         "created",
         "updated",
         "title",
         "description",
-    ]
-    list_filter = ["owner"]
+    )
+    list_filter = ("owner",)

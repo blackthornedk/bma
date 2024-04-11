@@ -1,3 +1,4 @@
+"""Tests for the Album API."""
 from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
 from oauth2_provider.models import get_application_model
@@ -14,10 +15,10 @@ class TestAlbumsApi(ApiTestBase):
 
     def test_album_create(
         self,
-        title="album title here",
-        description="album description here",
-        files=None,
-    ):
+        title: str = "album title here",
+        description: str = "album description here",
+        files: list[str] | None = None,
+    ) -> None:
         """Test creating an album."""
         response = self.client.post(
             reverse("api-v1-json:album_create"),
@@ -34,16 +35,16 @@ class TestAlbumsApi(ApiTestBase):
 
     def test_album_create_with_files(
         self,
-        title="album title here",
-        description="album description here",
-    ):
+        title: str = "album title here",
+        description: str = "album description here",
+    ) -> None:
         """Test creating an album with files."""
         self.files = []
         for _ in range(10):
             self.files.append(self.file_upload())
         self.test_album_create(title=title, description=description, files=self.files)
 
-    def test_album_update(self):
+    def test_album_update(self) -> None:
         """First replace then update."""
         self.test_album_create_with_files()
         # try with the wrong user
@@ -108,7 +109,7 @@ class TestAlbumsApi(ApiTestBase):
         assert response.status_code == 200
         assert len(response.json()["bma_response"]["files"]) == 0
 
-    def test_album_delete(self):
+    def test_album_delete(self) -> None:
         """Test deleting an album."""
         self.test_album_create_with_files()
 
@@ -139,7 +140,7 @@ class TestAlbumsApi(ApiTestBase):
         )
         assert response.status_code == 204
 
-    def test_album_get(self):
+    def test_album_get(self) -> None:
         """Get album metadata from the API."""
         self.test_album_create_with_files()
         response = self.client.get(
@@ -148,7 +149,7 @@ class TestAlbumsApi(ApiTestBase):
         )
         assert response.status_code == 200
 
-    def test_album_list(self):
+    def test_album_list(self) -> None:
         """Get album list from the API."""
         for i in range(10):
             self.test_album_create_with_files(title=f"album{i}")

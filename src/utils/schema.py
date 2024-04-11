@@ -40,7 +40,7 @@ class ApiMessageSchema(Schema):
     """The schema used for all API responses which are just messages."""
 
     # https://github.com/bornhack/bma/issues/167
-    bma_request: RequestMetadataSchema = 42  # type: ignore[assignment]
+    bma_request: RequestMetadataSchema = None  # type: ignore[assignment]
     message: str = "OK"
     details: dict[str, str] | None = None
 

@@ -62,9 +62,9 @@ class ApiTestBase(TestCase):
         # generate a verifier string from 43-128 chars
         alphabet = string.ascii_uppercase + string.digits
         code_verifier = "".join(secrets.choice(alphabet) for i in range(43 + secrets.randbelow(86)))
-        code_verifier = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
-        code_challenge = hashlib.sha256(code_verifier).digest()
-        code_challenge = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
+        code_verifier_base64 = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
+        code_challenge = hashlib.sha256(code_verifier_base64).digest()
+        code_challenge_base64 = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
 
         # this requires login
         cls.client.force_login(user)
@@ -76,7 +76,7 @@ class ApiTestBase(TestCase):
             "redirect_uri": "https://example.com/noexist/callback/",
             "response_type": "code",
             "allow": True,
-            "code_challenge": code_challenge,
+            "code_challenge": code_challenge_base64,
             "code_challenge_method": "S256",
         }
         response = cls.client.get("/o/authorize/", data=data)
@@ -97,7 +97,7 @@ class ApiTestBase(TestCase):
                 "code": qs["code"],
                 "redirect_uri": "https://example.com/noexist/callback/",
                 "client_id": f"client_id_{user.username}",
-                "code_verifier": code_verifier.decode("utf-8"),
+                "code_verifier": code_verifier_base64.decode("utf-8"),
             },
         )
         assert response.status_code == 200

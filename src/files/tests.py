@@ -1,4 +1,5 @@
-import os
+"""Tests for the files API."""
+from pathlib import Path
 
 from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
@@ -16,12 +17,14 @@ Grant = get_grant_model()
 class TestFilesApi(ApiTestBase):
     """Test for methods in the files API."""
 
-    def test_api_auth_bearer_token(self):
+    def test_api_auth_bearer_token(self) -> None:
+        """Test getting a token."""
         response = self.client.get("/o/authorized_tokens/", headers={"authorization": self.user1.auth})
         assert response.status_code == 200
         assert "revoke" in response.content.decode("utf-8")
 
-    def test_api_auth_get_refresh_token(self):
+    def test_api_auth_get_refresh_token(self) -> None:
+        """Test getting a refresh token."""
         response = self.client.post(
             "/o/token/",
             {
@@ -33,24 +36,23 @@ class TestFilesApi(ApiTestBase):
         assert response.status_code == 200
         assert "refresh_token" in response.json()
 
-    def test_api_auth_django_session(self):
+    def test_api_auth_django_session(self) -> None:
+        """Test getting authorised tokens."""
         self.client.force_login(self.user1)
         response = self.client.get("/o/authorized_tokens/")
         assert response.status_code == 200
         assert "revoke" in response.content.decode("utf-8")
 
-    def test_file_upload(self):
+    def test_file_upload(self) -> None:
         """Test file upload cornercases."""
         data = self.file_upload(title="", return_full=True)
         assert data["title"] == data["original_filename"]
         self.file_upload(file_license="notalicense", expect_status_code=422)
         self.file_upload(thumbnail_url="/foo/wrong.tar", expect_status_code=422)
 
-    def test_file_list(self):
+    def test_file_list(self) -> None:  # noqa: PLR0915
         """Test the file_list endpoint."""
-        files = []
-        for i in range(15):
-            files.append(self.file_upload(title=f"title{i}"))
+        files = [self.file_upload(title=f"title{i}") for i in range(15)]
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user1.auth})
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 15
@@ -122,7 +124,6 @@ class TestFilesApi(ApiTestBase):
             data={"albums": [self.album_uuid]},
             headers={"authorization": self.user1.auth},
         )
-        print(response.content)
         assert len(response.json()["bma_response"]) == 3
 
         # create another empty album
@@ -199,11 +200,9 @@ class TestFilesApi(ApiTestBase):
         )
         assert len(response.json()["bma_response"]) == 0
 
-    def test_file_list_permissions(self):
+    def test_file_list_permissions(self) -> None:
         """Test various permissions stuff for the file_list endpoint."""
-        files = []
-        for i in range(15):
-            files.append(self.file_upload(title=f"title{i}"))
+        files = [self.file_upload(title=f"title{i}") for i in range(15)]
 
         # no files should be visible
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user2.auth})
@@ -317,7 +316,7 @@ class TestFilesApi(ApiTestBase):
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 0
 
-    def test_metadata_get(self):
+    def test_metadata_get(self) -> None:
         """Get file metadata from the API."""
         self.file_upload()
         response = self.client.get(
@@ -328,7 +327,7 @@ class TestFilesApi(ApiTestBase):
         assert "uuid" in response.json()["bma_response"]
         assert response.json()["bma_response"]["uuid"] == self.file_uuid
 
-    def test_file_download(self):
+    def test_file_download(self) -> None:
         """Test downloading a file after uploading it."""
         self.file_upload()
         metadata = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user1.auth}).json()[
@@ -343,10 +342,10 @@ class TestFilesApi(ApiTestBase):
         response = self.client.get(url)
         assert response.status_code == 200
         assert response["content-type"] == "image/png"
-        with open("static_src/images/logo_wide_black_500_RGB.png", "rb") as f:
+        with Path("static_src/images/logo_wide_black_500_RGB.png").open("rb") as f:
             assert f.read() == response.getvalue()
 
-    def test_file_metadata_update(self):
+    def test_file_metadata_update(self) -> None:
         """Replace and then update file metadata."""
         self.file_upload()
         response = self.client.get(
@@ -449,19 +448,19 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 422
 
-    #   def test_post_csrf(self):
-    #       """Make sure CSRF is enforced on API views when using django session cookie auth."""
-    #       self.file_upload()
-    #       self.client.force_login(self.user)
-    #       response = self.client.patch(
-    #           reverse("api-v1-json:file_get", kwargs={"file_uuid": self.file_uuid}),
-    #           {"attribution": "csrfcheck"},
-    #           content_type="application/json",
-    #       )
-    #       # this should fail because we did not add CSRF..
-    #       assert response.status_code == 403
+    def test_post_csrf(self) -> None:
+        """Make sure CSRF is enforced on API views when using django session cookie auth."""
+        self.file_upload()
+        self.client.force_login(self.user0)
+        response = self.client.patch(
+            reverse("api-v1-json:file_get", kwargs={"file_uuid": self.file_uuid}),
+            {"attribution": "csrfcheck"},
+            content_type="application/json",
+        )
+        # this should fail because we did not add CSRF..
+        assert response.status_code == 403
 
-    def test_file_delete(self):
+    def test_file_delete(self) -> None:
         """Test deleting a file."""
         self.file_upload()
         # test with no auth
@@ -491,7 +490,7 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 204
 
-    def test_metadata_get_404(self):
+    def test_metadata_get_404(self) -> None:
         """Get file metadata get with wrong uuid returns 404."""
         response = self.client.get(
             reverse(
@@ -502,14 +501,14 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 404
 
-    def test_metadata_get_validationerror(self):
+    def test_metadata_get_validationerror(self) -> None:
         """Get file metadata get with something that is not a uuid."""
         response = self.client.get(
             reverse("api-v1-json:file_get", kwargs={"file_uuid": "notuuid"}), headers={"authorization": self.user1.auth}
         )
         assert response.status_code == 422
 
-    def test_metadata_get_403(self):
+    def test_metadata_get_403(self) -> None:
         """Get file metadata get with wrong uuid returns 404."""
         self.file_upload()
         response = self.client.get(
@@ -536,7 +535,7 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 403
 
-    def test_approve_files(self):
+    def test_approve_files(self) -> None:
         """Approve multiple files."""
         for _ in range(10):
             self.file_upload()
@@ -586,11 +585,11 @@ class TestFilesApi(ApiTestBase):
         )
         assert len(response.json()["bma_response"]) == 5
 
-    def test_file_missing_on_disk(self):
+    def test_file_missing_on_disk(self) -> None:
         """Test the case where a file has gone missing from disk for some reason."""
         self.file_upload()
         basefile = BaseFile.objects.get(uuid=self.file_uuid)
-        os.unlink(basefile.original.path)
+        Path(basefile.original.path).unlink()
         response = self.client.get(
             reverse(
                 "api-v1-json:file_get",
