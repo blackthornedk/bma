@@ -39,8 +39,8 @@ class RequestMetadataSchema(Schema):
 class ApiMessageSchema(Schema):
     """The schema used for all API responses which are just messages."""
 
-    # TODO(tykling): figure out why 1) bma_request needs a default to work, and 2) why that default can't be the schema
-    bma_request: RequestMetadataSchema = None  # type: ignore[assignment]
+    # https://github.com/bornhack/bma/issues/167
+    bma_request: RequestMetadataSchema = 42  # type: ignore[assignment]
     message: str = "OK"
     details: dict[str, str] | None = None
 
