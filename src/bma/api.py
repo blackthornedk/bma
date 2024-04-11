@@ -20,7 +20,6 @@ api_v1_json = NinjaAPI(
     version="1",
     # we require CSRF but disable it for non-session auth requests
     # inside ExemptOauthFromCSRFMiddleware
-    csrf=True,
     parser=ORJSONParser(),
     renderer=ORJSONRenderer(),
     urls_namespace="api-v1-json",

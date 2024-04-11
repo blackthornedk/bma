@@ -1,5 +1,6 @@
 """Schemas for album API calls."""
 import uuid
+from collections.abc import Sequence
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -14,7 +15,7 @@ class AlbumRequestSchema(ModelSchema):
 
     title: str = ""
     description: str = ""
-    files: list[uuid.UUID]
+    files: Sequence[uuid.UUID] = []
 
     class Config:
         """Set model and fields."""

@@ -3,7 +3,7 @@ import base64
 import hashlib
 import json
 import logging
-import random
+import secrets
 import string
 from pathlib import Path
 from urllib.parse import parse_qs
@@ -37,10 +37,7 @@ class ApiTestBase(TestCase):
 
         # create 4 regular users and 1 superuser
         for i in range(6):
-            if i == 5:
-                username = "superuser"
-            else:
-                username = f"user{i}"
+            username = "superuser" if i == 5 else f"user{i}"
             user = UserFactory.create(username=username)
             user.set_password("secret")
             if i == 5:
@@ -55,7 +52,7 @@ class ApiTestBase(TestCase):
                 client_type=Application.CLIENT_PUBLIC,
                 authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
                 client_id=f"client_id_{username}",
-                client_secret="client_secret",
+                client_secret="client_secret",  # noqa: S106
                 skip_authorization=True,
             )
             user.auth = cls.get_access_token(user)
@@ -63,12 +60,11 @@ class ApiTestBase(TestCase):
         cls.client.logout()
 
     @classmethod
-    def get_access_token(cls, user):
+    def get_access_token(cls, user) -> str:  # noqa: ANN001
         """Test the full oauth2 public client authorization code pkce token flow."""
-        # prepare to get access token
-        code_verifier = "".join(
-            random.choice(string.ascii_uppercase + string.digits) for _ in range(random.randint(43, 128))
-        )
+        # generate a verifier string from 43-128 chars
+        alphabet = string.ascii_uppercase + string.digits
+        code_verifier = "".join(secrets.choice(alphabet) for i in range(43 + secrets.randbelow(86)))
         code_verifier = base64.urlsafe_b64encode(code_verifier.encode("utf-8"))
         code_challenge = hashlib.sha256(code_verifier).digest()
         code_challenge = base64.urlsafe_b64encode(code_challenge).decode("utf-8").replace("=", "")
@@ -111,47 +107,48 @@ class ApiTestBase(TestCase):
         user.tokeninfo = json.loads(response.content)
         return f"Bearer {user.tokeninfo['access_token']}"
 
-    def file_upload(
-        cls,
-        filepath="static_src/images/logo_wide_black_500_RGB.png",
-        title="some title",
-        license="CC_ZERO_1_0",
-        attribution="fotoarne",
-        source="https://example.com/something.png",
-        thumbnail_url=None,
-        return_full=False,
-        expect_status_code=201,
-    ):
+    def file_upload(  # noqa: PLR0913
+        self,
+        *,
+        filepath: str = "static_src/images/logo_wide_black_500_RGB.png",
+        title: str = "some title",
+        file_license: str = "CC_ZERO_1_0",
+        attribution: str = "fotoarne",
+        source: str = "https://example.com/something.png",
+        thumbnail_url: str = "",
+        return_full: bool = False,
+        expect_status_code: int = 201,
+    ) -> str | dict[str, str]:
+        """The upload method used by many tests."""
         metadata = {
             "title": title,
-            "license": license,
+            "license": file_license,
             "attribution": attribution,
             "source": source,
         }
         if thumbnail_url:
             metadata["thumbnail_url"] = thumbnail_url
-        with open(filepath, "rb") as f:
-            response = cls.client.post(
+        with Path(filepath).open("rb") as f:
+            response = self.client.post(
                 reverse("api-v1-json:upload"),
                 {
                     "f": f,
                     "metadata": json.dumps(metadata),
                 },
-                HTTP_AUTHORIZATION=cls.user1.auth,
+                headers={"authorization": self.user1.auth},
             )
         assert response.status_code == expect_status_code
         if expect_status_code == 422:
             return None
-        data = response.json()
+        data = response.json()["bma_response"]
         assert "uuid" in data
         if not title:
             title = Path(filepath).name
         assert data["title"] == title
         assert data["attribution"] == attribution
-        assert data["license"] == license
+        assert data["license"] == file_license
         assert data["source"] == source
-        cls.file_uuid = data["uuid"]
+        self.file_uuid = data["uuid"]
         if return_full:
             return data
-        else:
-            return data["uuid"]
+        return data["uuid"]

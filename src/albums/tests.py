@@ -30,7 +30,7 @@ class TestAlbumsApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 201
-        self.album_uuid = response.json()["uuid"]
+        self.album_uuid = response.json()["bma_response"]["uuid"]
 
     def test_album_create_with_files(
         self,
@@ -84,9 +84,9 @@ class TestAlbumsApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 200
-        assert len(response.json()["files"]) == 2
-        assert response.json()["title"] == "new title"
-        assert response.json()["description"] == "description here"
+        assert len(response.json()["bma_response"]["files"]) == 2
+        assert response.json()["bma_response"]["title"] == "new title"
+        assert response.json()["bma_response"]["description"] == "description here"
 
         # update the album with more files
         response = self.client.patch(
@@ -96,7 +96,7 @@ class TestAlbumsApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 200
-        assert len(response.json()["files"]) == 10
+        assert len(response.json()["bma_response"]["files"]) == 10
 
         # update to remove all files
         response = self.client.patch(
@@ -106,7 +106,7 @@ class TestAlbumsApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 200
-        assert len(response.json()["files"]) == 0
+        assert len(response.json()["bma_response"]["files"]) == 0
 
     def test_album_delete(self):
         """Test deleting an album."""
@@ -154,16 +154,16 @@ class TestAlbumsApi(ApiTestBase):
             self.test_album_create_with_files(title=f"album{i}")
         response = self.client.get(reverse("api-v1-json:album_list"), headers={"authorization": self.user1.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 10
+        assert len(response.json()["bma_response"]) == 10
 
         # test the file filter with files in different albums
         response = self.client.get(
             reverse("api-v1-json:album_list"),
-            data={"files": [self.files[0], response.json()[1]["files"][0]]},
+            data={"files": [self.files[0], response.json()["bma_response"][1]["files"][0]]},
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
         # test with files in the same album
         response = self.client.get(
             reverse("api-v1-json:album_list"),
@@ -171,14 +171,14 @@ class TestAlbumsApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["bma_response"]) == 1
 
         # test search
         response = self.client.get(
             reverse("api-v1-json:album_list"), data={"search": "album4"}, headers={"authorization": self.user1.auth}
         )
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["bma_response"]) == 1
 
         # test sorting
         response = self.client.get(
@@ -187,8 +187,8 @@ class TestAlbumsApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert len(response.json()) == 10
-        assert response.json()[0]["title"] == "album9"
+        assert len(response.json()["bma_response"]) == 10
+        assert response.json()["bma_response"][0]["title"] == "album9"
 
         # test offset
         response = self.client.get(
@@ -197,5 +197,5 @@ class TestAlbumsApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert len(response.json()) == 5
-        assert response.json()[0]["title"] == "album5"
+        assert len(response.json()["bma_response"]) == 5
+        assert response.json()["bma_response"][0]["title"] == "album5"

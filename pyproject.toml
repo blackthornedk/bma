@@ -48,6 +48,7 @@ dev = [
 test = [
     "coverage==7.2.2",
     "factory-boy==3.2.1",
+    "pytest-django==4.8.0",
 ]
 
 [project.urls]
@@ -95,3 +96,9 @@ convention = "google"
 "*/migrations/*" = [
     "D" # https://docs.astral.sh/ruff/rules/#pydocstyle-d
 ]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "bma.settings"
+python_files = ["tests.py"]
+log_cli = 1
+log_cli_level = "DEBUG"

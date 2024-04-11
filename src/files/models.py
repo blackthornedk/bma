@@ -1,17 +1,24 @@
 """This file contains the main BMA model BaseFile and related classes."""
 import contextlib
+import logging
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import HttpRequest
 from django.urls import reverse
+from guardian.shortcuts import assign_perm
+from guardian.shortcuts import remove_perm
 from polymorphic.managers import PolymorphicQuerySet
 from polymorphic.models import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 from users.sentinel import get_sentinel_user
 
+from .validators import validate_file_status
 from .validators import validate_thumbnail_url
+
+logger = logging.getLogger("bma")
 
 
 class StatusChoices(models.TextChoices):
@@ -155,6 +162,7 @@ class BaseFile(PolymorphicModel):
     status = models.CharField(
         max_length=20,
         blank=False,
+        validators=[validate_file_status],
         choices=StatusChoices.choices,
         default="PENDING_MODERATION",
         help_text="The status of this file. Only published files are visible on the public website.",
@@ -202,6 +210,7 @@ class BaseFile(PolymorphicModel):
         """
         links: dict[str, str | dict[str, str]] = {
             "self": reverse("api-v1-json:file_get", kwargs={"file_uuid": self.uuid}),
+            "html": self.get_absolute_url(),
         }
         downloads: dict[str, str] = {
             "original": self.original.url,
@@ -243,3 +252,34 @@ class BaseFile(PolymorphicModel):
                 )
         links["downloads"] = downloads
         return links
+
+    def update_status(self, new_status: str) -> int:
+        """Update the status of a file."""
+        self.status = new_status
+        try:
+            self.full_clean()
+            self.save(update_fields=["status", "updated"])
+        except ValidationError:
+            logger.exception("Invalid file status.")
+            return 0
+        return 1
+
+    def approve(self) -> int:
+        """Approve this file and add publish/unpublish permissions to the owner."""
+        assign_perm("publish_basefile", self.owner, self)
+        assign_perm("unpublish_basefile", self.owner, self)
+        return self.unpublish()
+
+    def unapprove(self) -> int:
+        """Unapprove this file and remove publish/unpublish permissions to the owner."""
+        remove_perm("publish_basefile", self.owner, self)
+        remove_perm("unpublish_basefile", self.owner, self)
+        return self.update_status(new_status="PENDING_MODERATION")
+
+    def publish(self) -> int:
+        """Publish this file."""
+        return self.update_status(new_status="PUBLISHED")
+
+    def unpublish(self) -> int:
+        """Unpublish this file."""
+        return self.update_status(new_status="UNPUBLISHED")

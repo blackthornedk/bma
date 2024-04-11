@@ -43,7 +43,7 @@ class TestFilesApi(ApiTestBase):
         """Test file upload cornercases."""
         data = self.file_upload(title="", return_full=True)
         assert data["title"] == data["original_filename"]
-        self.file_upload(license="notalicense", expect_status_code=422)
+        self.file_upload(file_license="notalicense", expect_status_code=422)
         self.file_upload(thumbnail_url="/foo/wrong.tar", expect_status_code=422)
 
     def test_file_list(self):
@@ -53,7 +53,7 @@ class TestFilesApi(ApiTestBase):
             files.append(self.file_upload(title=f"title{i}"))
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user1.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
 
         # test sorting
         response = self.client.get(
@@ -61,17 +61,17 @@ class TestFilesApi(ApiTestBase):
             data={"limit": 5, "sorting": "title_asc"},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 5
-        assert response.json()[0]["title"] == "title0"
-        assert response.json()[1]["title"] == "title1"
-        assert response.json()[2]["title"] == "title10"
-        assert response.json()[4]["title"] == "title12"
+        assert len(response.json()["bma_response"]) == 5
+        assert response.json()["bma_response"][0]["title"] == "title0"
+        assert response.json()["bma_response"][1]["title"] == "title1"
+        assert response.json()["bma_response"][2]["title"] == "title10"
+        assert response.json()["bma_response"][4]["title"] == "title12"
         response = self.client.get(
             reverse("api-v1-json:file_list"),
             data={"limit": 1, "sorting": "created_desc"},
             headers={"authorization": self.user1.auth},
         )
-        assert response.json()[0]["title"] == "title14"
+        assert response.json()["bma_response"][0]["title"] == "title14"
 
         # test offset
         response = self.client.get(
@@ -79,8 +79,8 @@ class TestFilesApi(ApiTestBase):
             data={"offset": 5, "sorting": "created_asc"},
             headers={"authorization": self.user1.auth},
         )
-        assert response.json()[0]["title"] == "title5"
-        assert response.json()[4]["title"] == "title9"
+        assert response.json()["bma_response"][0]["title"] == "title5"
+        assert response.json()["bma_response"][4]["title"] == "title9"
 
         # test owner filter
         response = self.client.get(
@@ -88,20 +88,20 @@ class TestFilesApi(ApiTestBase):
             data={"owners": [self.user1.uuid, self.user2.uuid]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
         response = self.client.get(
             reverse("api-v1-json:file_list"),
             data={"owners": [self.user2.uuid]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
         # test search
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"search": "title7"}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 1
-        assert response.json()[0]["title"] == "title7"
+        assert len(response.json()["bma_response"]) == 1
+        assert response.json()["bma_response"][0]["title"] == "title7"
 
         # create an album with some files
         response = self.client.post(
@@ -114,7 +114,7 @@ class TestFilesApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 201
-        self.album_uuid = response.json()["uuid"]
+        self.album_uuid = response.json()["bma_response"]["uuid"]
 
         # test album filter
         response = self.client.get(
@@ -122,7 +122,8 @@ class TestFilesApi(ApiTestBase):
             data={"albums": [self.album_uuid]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 3
+        print(response.content)
+        assert len(response.json()["bma_response"]) == 3
 
         # create another empty album
         response = self.client.post(
@@ -134,7 +135,7 @@ class TestFilesApi(ApiTestBase):
             content_type="application/json",
         )
         assert response.status_code == 201
-        uuid = response.json()["uuid"]
+        uuid = response.json()["bma_response"]["uuid"]
 
         # test filtering for multiple albums
         response = self.client.get(
@@ -142,33 +143,33 @@ class TestFilesApi(ApiTestBase):
             data={"albums": [self.album_uuid, uuid]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 3
+        assert len(response.json()["bma_response"]) == 3
 
         # test file size filter
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size": 9478}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
 
         # test file size_lt filter
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size_lt": 10000}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size_lt": 1000}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
         # test file size_gt filter
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size_gt": 10000}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size_gt": 1000}, headers={"authorization": self.user1.auth}
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
 
         # test file type filter
         response = self.client.get(
@@ -176,13 +177,13 @@ class TestFilesApi(ApiTestBase):
             data={"filetypes": ["picture"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
         response = self.client.get(
             reverse("api-v1-json:file_list"),
             data={"filetypes": ["audio", "video", "document"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
         # test file license filter
         response = self.client.get(
@@ -190,13 +191,13 @@ class TestFilesApi(ApiTestBase):
             data={"licenses": ["CC_ZERO_1_0"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
         response = self.client.get(
             reverse("api-v1-json:file_list"),
             data={"licenses": ["CC_BY_4_0", "CC_BY_SA_4_0"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
     def test_file_list_permissions(self):
         """Test various permissions stuff for the file_list endpoint."""
@@ -207,44 +208,44 @@ class TestFilesApi(ApiTestBase):
         # no files should be visible
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user2.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
         # the superuser can see all files
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.superuser.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 15
+        assert len(response.json()["bma_response"]) == 15
 
         # attempt to publish a file before approval
         response = self.client.patch(
-            reverse("api-v1-json:file_publish", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:publish_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 403
 
         # approve the file without permission
         response = self.client.patch(
-            reverse("api-v1-json:file_approve", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:approve_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 403
 
         # approve the file, check mode
         response = self.client.patch(
-            reverse("api-v1-json:file_approve", kwargs={"file_uuid": files[0]}) + "?check=true",
+            reverse("api-v1-json:approve_file", kwargs={"file_uuid": files[0]}) + "?check=true",
             headers={"authorization": self.superuser.auth},
         )
         assert response.status_code == 202
 
         # really approve the file
         response = self.client.patch(
-            reverse("api-v1-json:file_approve", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:approve_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.superuser.auth},
         )
         assert response.status_code == 200
 
         # try again with wrong status
         response = self.client.patch(
-            reverse("api-v1-json:file_approve", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:approve_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.superuser.auth},
         )
         assert response.status_code == 403
@@ -255,18 +256,18 @@ class TestFilesApi(ApiTestBase):
             data={"statuses": ["UNPUBLISHED"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 1
+        assert len(response.json()["bma_response"]) == 1
 
         # publish a file, check mode
         response = self.client.patch(
-            reverse("api-v1-json:file_publish", kwargs={"file_uuid": files[0]}) + "?check=true",
+            reverse("api-v1-json:publish_file", kwargs={"file_uuid": files[0]}) + "?check=true",
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 202
 
         # publish the file
         response = self.client.patch(
-            reverse("api-v1-json:file_publish", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:publish_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
@@ -274,32 +275,32 @@ class TestFilesApi(ApiTestBase):
         # make sure someone else can see it
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user2.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["bma_response"]) == 1
 
         # make sure anonymous can see it
         response = self.client.get(
             reverse("api-v1-json:file_list"),
         )
         assert response.status_code == 200
-        assert len(response.json()) == 1
+        assert len(response.json()["bma_response"]) == 1
 
         # unpublish the file without permission
         response = self.client.patch(
-            reverse("api-v1-json:file_unpublish", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:unpublish_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.user2.auth},
         )
         assert response.status_code == 403
 
         # unpublish the file, check mode
         response = self.client.patch(
-            reverse("api-v1-json:file_unpublish", kwargs={"file_uuid": files[0]}) + "?check=true",
+            reverse("api-v1-json:unpublish_file", kwargs={"file_uuid": files[0]}) + "?check=true",
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 202
 
         # unpublish the file
         response = self.client.patch(
-            reverse("api-v1-json:file_unpublish", kwargs={"file_uuid": files[0]}),
+            reverse("api-v1-json:unpublish_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
@@ -307,14 +308,14 @@ class TestFilesApi(ApiTestBase):
         # make sure it is not visible anymore
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user2.auth})
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
         # make sure it is not visible anymore to anonymous
         response = self.client.get(
             reverse("api-v1-json:file_list"),
         )
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["bma_response"]) == 0
 
     def test_metadata_get(self):
         """Get file metadata from the API."""
@@ -324,19 +325,19 @@ class TestFilesApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert "uuid" in response.json()
-        assert response.json()["uuid"] == self.file_uuid
+        assert "uuid" in response.json()["bma_response"]
+        assert response.json()["bma_response"]["uuid"] == self.file_uuid
 
     def test_file_download(self):
         """Test downloading a file after uploading it."""
         self.file_upload()
         metadata = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user1.auth}).json()[
-            0
-        ]
+            "bma_response"
+        ][0]
         url = metadata["links"]["downloads"]["original"]
         # try download of unpublished file without auth
         response = self.client.get(url)
-        assert response.status_code == 404
+        assert response.status_code == 403
         # try again with auth
         self.client.force_login(self.user1)
         response = self.client.get(url)
@@ -353,7 +354,7 @@ class TestFilesApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        original_metadata = response.json()
+        original_metadata = response.json()["bma_response"]
         updates = {
             "title": "some title",
             "description": "some description",
@@ -397,14 +398,14 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 200
         original_metadata.update(updates)
-        for k, v in response.json().items():
+        for k, v in response.json()["bma_response"].items():
             # "updated" will have changed of course,
             if k == "updated":
                 assert v != original_metadata[k]
             # and "source" was initially set but not specified in the PUT call,
-            # so it should be blank now
+            # so it should be blank now, so it should return the files detail url
             elif k == "source":
-                assert v == ""
+                assert v == original_metadata["links"]["html"]
             # everything else should be the same
             else:
                 assert v == original_metadata[k]
@@ -436,8 +437,8 @@ class TestFilesApi(ApiTestBase):
         assert response.status_code == 200
 
         # make sure we updated only the source attribute with the PATCH request
-        assert response.json()["source"] == "https://example.com/foo.png"
-        assert response.json()["attribution"] == "some attribution"
+        assert response.json()["bma_response"]["source"] == "https://example.com/foo.png"
+        assert response.json()["bma_response"]["attribution"] == "some attribution"
 
         # update thumbnail to an invalid value
         response = self.client.patch(
@@ -535,15 +536,15 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 403
 
-    def test_file_approve_multiple(self):
+    def test_approve_files(self):
         """Approve multiple files."""
         for _ in range(10):
             self.file_upload()
         response = self.client.get(reverse("api-v1-json:file_list"), headers={"authorization": self.user1.auth})
-        files = [f["uuid"] for f in response.json()]
+        files = [f["uuid"] for f in response.json()["bma_response"]]
         # first try with no permissions
         response = self.client.patch(
-            reverse("api-v1-json:file_approve_multiple"),
+            reverse("api-v1-json:approve_files"),
             {"files": files[0:5]},
             headers={"authorization": self.user1.auth},
             content_type="application/json",
@@ -552,7 +553,7 @@ class TestFilesApi(ApiTestBase):
 
         # then check mode
         response = self.client.patch(
-            reverse("api-v1-json:file_approve_multiple") + "?check=true",
+            reverse("api-v1-json:approve_files") + "?check=true",
             {"files": files[0:5]},
             headers={"authorization": self.superuser.auth},
             content_type="application/json",
@@ -561,7 +562,7 @@ class TestFilesApi(ApiTestBase):
 
         # then with permission
         response = self.client.patch(
-            reverse("api-v1-json:file_approve_multiple"),
+            reverse("api-v1-json:approve_files"),
             {"files": files[0:5]},
             headers={"authorization": self.superuser.auth},
             content_type="application/json",
@@ -570,7 +571,7 @@ class TestFilesApi(ApiTestBase):
 
         # then try approving the same files again
         response = self.client.patch(
-            reverse("api-v1-json:file_approve_multiple"),
+            reverse("api-v1-json:approve_files"),
             {"files": files[0:5]},
             headers={"authorization": self.superuser.auth},
             content_type="application/json",
@@ -583,7 +584,7 @@ class TestFilesApi(ApiTestBase):
             data={"statuses": ["UNPUBLISHED"]},
             headers={"authorization": self.user1.auth},
         )
-        assert len(response.json()) == 5
+        assert len(response.json()["bma_response"]) == 5
 
     def test_file_missing_on_disk(self):
         """Test the case where a file has gone missing from disk for some reason."""
@@ -598,4 +599,4 @@ class TestFilesApi(ApiTestBase):
             headers={"authorization": self.user1.auth},
         )
         assert response.status_code == 200
-        assert response.json()["size_bytes"] == 0
+        assert response.json()["bma_response"]["size_bytes"] == 0

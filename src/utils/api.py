@@ -1,13 +1,12 @@
 """API related utility functions."""
+from typing import TypeAlias
+
 from albums.models import Album
 from django.db.models import QuerySet
 from files.models import BaseFile
 
-from utils.schema import ApiResponseSchema
+from .schema import ApiMessageSchema
 
-
-def wrap_response(
-    payload: list[str] | dict[str, str] | QuerySet[Album] | QuerySet[BaseFile] | Album | BaseFile,
-) -> ApiResponseSchema:
-    """Wrap the response payload in the api envelope."""
-    return ApiResponseSchema(bma_request=None, bma_response=payload)
+# type aliases to make API return types more readable
+FileApiResponseType: TypeAlias = tuple[int, ApiMessageSchema | dict[str, BaseFile | QuerySet[BaseFile] | str]]
+AlbumApiResponseType: TypeAlias = tuple[int, ApiMessageSchema | dict[str, Album | QuerySet[Album] | str]]

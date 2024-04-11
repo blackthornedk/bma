@@ -70,7 +70,7 @@ class SingleFileRequestSchema(Schema):
 class MultipleFileRequestSchema(Schema):
     """The schema used for requests involving multiple files."""
 
-    file_uuids: list[uuid.UUID]
+    files: list[uuid.UUID]
 
 
 """Response schemas below here."""
@@ -123,7 +123,7 @@ class FileResponseSchema(ModelSchema):
     @staticmethod
     def resolve_size_bytes(obj: BaseFile, context: dict[str, HttpRequest]) -> int:
         """Get the value for the size_bytes field, return 0 if file is not found."""
-        if Path.exists(obj.original.path):
+        if Path(obj.original.path).exists():
             return int(obj.original.size)
         return 0
 
