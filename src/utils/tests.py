@@ -30,9 +30,6 @@ class ApiTestBase(TestCase):
         """Test setup."""
         # disable logging
         logging.disable(logging.CRITICAL)
-
-        # TODO(tykling): figure out why using ORJSONRenderer() doesn't work
-        # cls.client = Client(enforce_csrf_checks=True, json_encoder=ORJSONRenderer())
         cls.client = Client(enforce_csrf_checks=True)
 
         # create 4 regular users and 1 superuser
