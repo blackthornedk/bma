@@ -39,7 +39,7 @@ jobs:
           path: "src"
 
       - name: "Copy settings"
-        run: "cp src/bma/environment_settings_ci.py src/bma/environment_settings.py"
+        run: "cp ./src/bma/environment_settings_ci.py ./src/bma/environment_settings.py"
 
       - name: "Install python dependencies"
         run: "python -m pip install ./src/[test]"
