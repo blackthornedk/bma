@@ -1,0 +1,101 @@
+from pathlib import Path
+
+from environs import Env
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# read os.environ or .env file
+env = Env()
+env.read_env()
+
+# log levels for django and BMA
+DJANGO_LOG_LEVEL = env.str("DJANGO_LOG_LEVEL", default="INFO")
+BMA_LOG_LEVEL = env.str("DJANGO_BMA_LOG_LEVEL", default="DEBUG")
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = env.str("DJANGO_SECRET_KEY", default="hunter12")
+
+# debug settings - remember to set allowed_hosts if debug is disabled
+DEBUG = True
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+
+# Database settings
+DATABASES = {
+    "default": env.dj_db_url(
+        "DJANGO_DATABASE_URL", default="postgres://bma:bma@127.0.0.1/bmadb"
+    )
+}
+
+# admin site url prefix, set to 'admin' for /admin/
+ADMIN_PREFIX = "admin"
+
+# secure cookies and proxy header
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# uploaded or generated files are placed below MEDIA_ROOT
+MEDIA_ROOT = Path("/django_media_root")
+
+OAUTH_SERVER_BASEURL="http://127.0.0.1:8000"
+
+NGINX_PROXY=False
+
+ALLOWED_PICTURE_TYPES={
+    "image/jpeg": ["jpg", "jpe", "jpeg"],
+    "image/bmp": ["bmp"],
+    "image/svg+xml": ["svg"],
+    "image/tiff": ["tif", "tiff"],
+    "image/png": ["png"],
+}
+
+ALLOWED_VIDEO_TYPES={
+    "video/mpeg": ["mp2", "mpa", "mpe", "mpeg", "mpg", "mpv2"],
+    "video/mp4": ["mp4"],
+    "video/quicktime": ["mov", "qt"],
+    "video/x-ms-asf": ["asf", "asr", "asx"],
+}
+
+ALLOWED_AUDIO_TYPES={
+    "audio/basic": ["snd", "au"],
+    "audio/mid": ["mid", "rmi"],
+    "audio/mpeg": ["mp3"],
+    "audio/x-aiff": ["aif", "aifc", "aiff"],
+    "audio/x-pn-realaudio": ["ra", "ram"],
+    "audio/x-wav": ["wav"],
+}
+
+ALLOWED_DOCUMENT_TYPES={
+    "text/plain": ["txt"],
+    "application/pdf": ["pdf"],
+}
+
+# filetype icons
+FILETYPE_ICONS = {
+    "basefile": "fas fa-file",
+    "picture": "fas fa-file-image",
+    "video": "fas fa-file-video",
+    "audio": "fas fa-file-audio",
+    "document": "fas fa-file-lines",
+}
+
+# status icons
+FILESTATUS_ICONS = {
+    "PENDING_MODERATION": "fas fa-clock",
+    "UNPUBLISHED": "fas fa-cloud-arrow-down",
+    "PUBLISHED": "fas fa-cloud-arrow-up",
+    "PENDING_DELETION": "fas fa-thrash-clock",
+}
+
+DEFAULT_THUMBNAIL_URLS = {
+    "basefile": "/static/images/file-solid.png",
+    "picture": "/static/images/file-image-solid.png",
+    "video": "/static/images/file-video-solid.png",
+    "audio": "/static/images/file-audio-solid.png",
+    "document": "/static/images/file-alt-solid.png",
+}
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+]
