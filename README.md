@@ -1,4 +1,4 @@
-[![Run Tox CI](https://github.com/bornhack/bma/actions/workflows/tox.yml/badge.svg?branch=main)](https://github.com/bornhack/bma/actions/workflows/tox.yml)
+[![Run Tox CI](https://github.com/bornhack/bma/actions/workflows/tox.yml/badge.svg?branch=develop)](https://github.com/bornhack/bma/actions/workflows/tox.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![codecov](https://codecov.io/gh/bornhack/bma/graph/badge.svg?token=AN3NmaCDAr)](https://codecov.io/gh/bornhack/bma)
 
