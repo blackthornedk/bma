@@ -49,6 +49,7 @@ test = [
     "coverage==7.2.2",
     "factory-boy==3.2.1",
     "pytest-django==4.8.0",
+    "tox==4.14.2",
 ]
 
 [project.urls]
@@ -102,6 +103,11 @@ DJANGO_SETTINGS_MODULE = "bma.settings"
 python_files = ["tests.py"]
 log_cli = 1
 log_cli_level = "DEBUG"
+filterwarnings = [
+    "error",
+    # https://github.com/vitalik/django-ninja/issues/1093
+    "ignore::DeprecationWarning",
+]
 
 [tool.mypy]
 plugins = [
@@ -117,3 +123,21 @@ django_settings_module = "bma.settings"
 
 [tool.mypy_django_plugin]
 ignore_missing_model_attributes = true
+
+[tool.tox]
+legacy_tox_ini = """
+    [tox]
+    envlist = py310, py311
+    skipsdist = True
+
+    [testenv]
+    changedir = src/
+
+    deps =
+        pytest
+        pytest-cov
+        pytest-randomly
+        django-stubs-ext
+        -e.[test]
+    commands = pytest
+"""
