@@ -36,7 +36,7 @@ CSRF_COOKIE_SECURE = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # uploaded or generated files are placed below MEDIA_ROOT
-MEDIA_ROOT = Path("/django_media_root")
+MEDIA_ROOT = BASE_DIR / "/django_media_root"
 
 OAUTH_SERVER_BASEURL="http://127.0.0.1:8000"
 
