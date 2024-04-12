@@ -35,18 +35,15 @@ jobs:
 
       - name: "Check out main repo"
         uses: "actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11"
-        with:
-          path: "src"
 
       - name: "Copy settings"
-        run: "cp ./src/bma/environment_settings.py.ci ./src/bma/environment_settings.py"
+        run: "cp src/bma/environment_settings.py.ci src/bma/environment_settings.py"
 
       - name: "Install python dependencies"
-        run: "python -m pip install ./src/[test]"
+        run: "python -m pip install .[test]"
 
       - name: "Run Tox"
         run: "tox -e py"
-        working-directory: "./src"
 
       - name: "Upload coverage to Codecov"
         uses: "codecov/codecov-action@v4.0.1"
@@ -54,6 +51,5 @@ jobs:
           token: "${{secrets.CODECOV_TOKEN}}"
           # disable until codecov improves stability
           # fail_ci_if_error: true
-          files: "./src/coverage.xml"
-          working-directory: "./src"
+          files: "coverage.xml"
 ...
