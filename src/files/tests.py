@@ -1,4 +1,5 @@
 """Tests for the files API."""
+from django.conf import settings
 from pathlib import Path
 
 from django.urls import reverse
@@ -342,7 +343,7 @@ class TestFilesApi(ApiTestBase):
         response = self.client.get(url)
         assert response.status_code == 200
         assert response["content-type"] == "image/png"
-        with Path("static_src/images/logo_wide_black_500_RGB.png").open("rb") as f:
+        with (settings.BASE_DIR / "static_src/images/logo_wide_black_500_RGB.png").open("rb") as f:
             assert f.read() == response.getvalue()
 
     def test_file_metadata_update(self) -> None:

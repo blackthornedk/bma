@@ -1,4 +1,5 @@
 """Unit tests base class."""
+from django.conf import settings
 import base64
 import hashlib
 import json
@@ -107,7 +108,7 @@ class ApiTestBase(TestCase):
     def file_upload(  # noqa: PLR0913
         self,
         *,
-        filepath: str = "static_src/images/logo_wide_black_500_RGB.png",
+        filepath: str = settings.BASE_DIR / "static_src/images/logo_wide_black_500_RGB.png",
         title: str = "some title",
         file_license: str = "CC_ZERO_1_0",
         attribution: str = "fotoarne",
