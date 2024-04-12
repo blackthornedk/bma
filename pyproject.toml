@@ -102,3 +102,18 @@ DJANGO_SETTINGS_MODULE = "bma.settings"
 python_files = ["tests.py"]
 log_cli = 1
 log_cli_level = "DEBUG"
+
+[tool.mypy]
+plugins = [
+    "mypy_django_plugin.main"
+]
+mypy_path = "src"
+ignore_missing_imports = true
+disallow_subclassing_any = false
+strict = true
+
+[tool.django-stubs]
+django_settings_module = "bma.settings"
+
+[tool.mypy_django_plugin]
+ignore_missing_model_attributes = true
