@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.test import Client
 from django.test import TestCase
 from django.urls import reverse
@@ -33,15 +34,25 @@ class ApiTestBase(TestCase):
         logging.disable(logging.CRITICAL)
         cls.client = Client(enforce_csrf_checks=True)
 
-        # create 4 regular users and 1 superuser
-        for i in range(6):
-            username = "superuser" if i == 5 else f"user{i}"
-            user = UserFactory.create(username=username)
+        # create 2 regular users, 2 creators, 2 moderators, 2 curators, and 1 superuser
+        for i in range(9):
+            kwargs = {}
+            if i in [0, 1]:
+                kwargs["username"] = f"user{i}"
+            elif i in [2, 3]:
+                kwargs["username"] = f"creator{i}"
+            elif i in [4, 5]:
+                kwargs["username"] = f"moderator{i}"
+            elif i in [6, 7]:
+                kwargs["username"] = f"curator{i}"
+            elif i == 8:
+                kwargs["username"] = "superuser"
+                kwargs["is_superuser"] = True
+                kwargs["is_staff"] = True
+            user = UserFactory.create(**kwargs)
             user.set_password("secret")
-            if i == 5:
-                user.is_superuser = True
             user.save()
-            setattr(cls, username, user)
+            setattr(cls, user.username, user)
             # create oauth application
             cls.application = Application.objects.create(
                 name="Test Application",
@@ -49,13 +60,21 @@ class ApiTestBase(TestCase):
                 user=user,
                 client_type=Application.CLIENT_PUBLIC,
                 authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
-                client_id=f"client_id_{username}",
-                client_secret="client_secret",  # noqa: S106
+                client_id=f"client_id_{user.username}",
+                client_secret="client_secret",
                 skip_authorization=True,
             )
             user.auth = cls.get_access_token(user)
             user.save()
-        cls.client.logout()
+            cls.client.logout()
+
+        # create groups and add users
+        creators = Group.objects.create(name=settings.BMA_CREATOR_GROUP_NAME)
+        creators.user_set.add(cls.creator2, cls.creator3)
+        moderators = Group.objects.create(name=settings.BMA_MODERATOR_GROUP_NAME)
+        moderators.user_set.add(cls.moderator4, cls.moderator5)
+        curators = Group.objects.create(name=settings.BMA_CURATOR_GROUP_NAME)
+        curators.user_set.add(cls.curator6, cls.curator7)
 
     @classmethod
     def get_access_token(cls, user) -> str:  # noqa: ANN001
@@ -90,7 +109,7 @@ class ApiTestBase(TestCase):
         # the rest doesn't require login
         cls.client.logout()
 
-        # get the code to get the access token
+        # get the access token
         response = cls.client.post(
             "/o/token/",
             {
@@ -108,6 +127,7 @@ class ApiTestBase(TestCase):
     def file_upload(  # noqa: PLR0913
         self,
         *,
+        owner: str = "creator2",
         filepath: str = settings.BASE_DIR / "static_src/images/logo_wide_black_500_RGB.png",
         title: str = "some title",
         file_license: str = "CC_ZERO_1_0",
@@ -133,7 +153,7 @@ class ApiTestBase(TestCase):
                     "f": f,
                     "metadata": json.dumps(metadata),
                 },
-                headers={"authorization": self.user1.auth},
+                headers={"authorization": getattr(self, owner).auth},
             )
         assert response.status_code == expect_status_code
         if expect_status_code == 422:

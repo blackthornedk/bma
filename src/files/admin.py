@@ -16,7 +16,7 @@ from .models import BaseFile
 
 @admin.register(BaseFile)
 class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
-    """The ModelAdmin class to manage files."""
+    """The ModelAdmin class to manage files. Used by the regular admin and FileAdmin."""
 
     readonly_fields = ("status", "original_filename", "file_size", "license", "owner")
 
@@ -43,6 +43,8 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         valid_actions = actions.copy()
         for action in actions:
             if not get_objects_for_user(request.user, f"{action}_basefile", klass=BaseFile).exists():
+                # user does not have permission to perform this action on any objects,
+                # remove it from the actions list
                 del valid_actions[action]
         return valid_actions
 
@@ -125,8 +127,8 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         self.message_user(
             request,
             f"{selected} files selected to be {action}, "
-            "out of those {valid} files had needed permission and expected status, "
-            "and out of those {updated} files were successfully {action}",
+            f"out of those {valid} files had needed permission and expected status, "
+            f"and out of those {updated} files were successfully {action}",
             status,
         )
 
@@ -209,6 +211,7 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
             return mark_safe(f'<a href="{obj.original.url}"><img src = "{obj.thumbnail_url}" width = "200"/></a>')  # noqa: S308
         except AttributeError:
             return ""
+
 
 # register the BaseFile model in the file_admin
 file_admin.register(BaseFile, BaseFileAdmin)

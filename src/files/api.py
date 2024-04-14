@@ -12,7 +12,6 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from documents.models import Document
-from guardian.shortcuts import assign_perm
 from guardian.shortcuts import get_objects_for_user
 from ninja import Query
 from ninja import Router
@@ -92,7 +91,7 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
     # save everything
     uploaded_file.save()
 
-    # if the filetype is picture then use the picture itself as thumbnail,
+    # if the filetype is picture then use the pictures large_thumbnail as thumbnail,
     # this has to be done after .save() to ensure the uuid filename and
     # full path is passed to the imagekit namer
     if (
@@ -104,10 +103,9 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
         uploaded_file.save(update_fields=["thumbnail_url", "updated"])
 
     # assign permissions (publish_basefile and unpublish_basefile are assigned after moderation)
-    assign_perm("view_basefile", request.user, uploaded_file)
-    assign_perm("change_basefile", request.user, uploaded_file)
-    assign_perm("delete_basefile", request.user, uploaded_file)
+    uploaded_file.add_initial_permissions()
 
+    # all good
     return 201, {"bma_response": uploaded_file, "message": f"File {uploaded_file.uuid} uploaded OK!"}
 
 

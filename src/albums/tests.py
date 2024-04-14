@@ -27,7 +27,7 @@ class TestAlbumsApi(ApiTestBase):
                 "description": description,
                 "files": files if files else [],
             },
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
             content_type="application/json",
         )
         assert response.status_code == 201
@@ -55,7 +55,7 @@ class TestAlbumsApi(ApiTestBase):
                 "description": "description here",
                 "files": self.files[0:2],
             },
-            headers={"authorization": self.user2.auth},
+            headers={"authorization": self.user0.auth},
             content_type="application/json",
         )
         assert response.status_code == 403
@@ -68,7 +68,7 @@ class TestAlbumsApi(ApiTestBase):
                 "description": "description here",
                 "files": self.files[0:2],
             },
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
             content_type="application/json",
         )
         assert response.status_code == 202
@@ -81,7 +81,7 @@ class TestAlbumsApi(ApiTestBase):
                 "description": "description here",
                 "files": self.files[0:2],
             },
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -93,7 +93,7 @@ class TestAlbumsApi(ApiTestBase):
         response = self.client.patch(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}),
             {"files": self.files},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -103,7 +103,7 @@ class TestAlbumsApi(ApiTestBase):
         response = self.client.patch(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}),
             {"files": []},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
             content_type="application/json",
         )
         assert response.status_code == 200
@@ -122,21 +122,21 @@ class TestAlbumsApi(ApiTestBase):
         # test with wrong auth
         response = self.client.delete(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}),
-            headers={"authorization": self.user2.auth},
+            headers={"authorization": self.user0.auth},
         )
         assert response.status_code == 403
 
         # delete the album, check mode
         response = self.client.delete(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}) + "?check=true",
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 202
 
         # delete the album
         response = self.client.delete(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}),
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 204
 
@@ -145,7 +145,7 @@ class TestAlbumsApi(ApiTestBase):
         self.test_album_create_with_files()
         response = self.client.get(
             reverse("api-v1-json:album_get", kwargs={"album_uuid": self.album_uuid}),
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 200
 
@@ -153,7 +153,7 @@ class TestAlbumsApi(ApiTestBase):
         """Get album list from the API."""
         for i in range(10):
             self.test_album_create_with_files(title=f"album{i}")
-        response = self.client.get(reverse("api-v1-json:album_list"), headers={"authorization": self.user1.auth})
+        response = self.client.get(reverse("api-v1-json:album_list"), headers={"authorization": self.curator6.auth})
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 10
 
@@ -161,22 +161,23 @@ class TestAlbumsApi(ApiTestBase):
         response = self.client.get(
             reverse("api-v1-json:album_list"),
             data={"files": [self.files[0], response.json()["bma_response"][1]["files"][0]]},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 0
+
         # test with files in the same album
         response = self.client.get(
             reverse("api-v1-json:album_list"),
             data={"files": [self.files[0], self.files[1]]},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 1
 
         # test search
         response = self.client.get(
-            reverse("api-v1-json:album_list"), data={"search": "album4"}, headers={"authorization": self.user1.auth}
+            reverse("api-v1-json:album_list"), data={"search": "album4"}, headers={"authorization": self.curator6.auth}
         )
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 1
@@ -185,7 +186,7 @@ class TestAlbumsApi(ApiTestBase):
         response = self.client.get(
             reverse("api-v1-json:album_list"),
             data={"sorting": "created_desc"},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 10
@@ -195,7 +196,7 @@ class TestAlbumsApi(ApiTestBase):
         response = self.client.get(
             reverse("api-v1-json:album_list"),
             data={"sorting": "title_asc", "offset": 5},
-            headers={"authorization": self.user1.auth},
+            headers={"authorization": self.curator6.auth},
         )
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 5

@@ -3,6 +3,8 @@ from allauth.account.utils import user_field
 from allauth.account.utils import user_username
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.models import SocialLogin
+from django.conf import settings
+from django.contrib.auth.models import Group
 from django.http import HttpRequest
 
 
@@ -23,5 +25,9 @@ class BornHackSocialAccountAdapter(DefaultSocialAccountAdapter):
 
         # set description on the user object
         user_field(sociallogin.user, "description", data.get("description"))
+
+        # add to curators group
+        curators, created = Group.objects.get_or_create(name=settings.BMA_CURATOR_GROUP_NAME)
+        curators.user_set.add(sociallogin.user)
 
         return sociallogin.user

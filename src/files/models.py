@@ -4,6 +4,8 @@ import logging
 import uuid
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import HttpRequest
@@ -19,6 +21,8 @@ from .validators import validate_file_status
 from .validators import validate_thumbnail_url
 
 logger = logging.getLogger("bma")
+
+User = get_user_model()
 
 
 class StatusChoices(models.TextChoices):
@@ -285,3 +289,17 @@ class BaseFile(PolymorphicModel):
     def unpublish(self) -> int:
         """Unpublish this file."""
         return self.update_status(new_status="UNPUBLISHED")
+
+    def add_initial_permissions(self) -> None:
+        """Add initial permissions for newly uploaded files."""
+        # add owner permissions
+        assign_perm("view_basefile", self.owner, self)
+        assign_perm("change_basefile", self.owner, self)
+        assign_perm("delete_basefile", self.owner, self)
+        moderators, created = Group.objects.get_or_create(name=settings.BMA_MODERATOR_GROUP_NAME)
+        if created:
+            logger.debug("Created new group 'moderators'")
+        # add moderator permissions
+        assign_perm("view_basefile", moderators, self)
+        assign_perm("approve_basefile", moderators, self)
+        assign_perm("unapprove_basefile", moderators, self)
