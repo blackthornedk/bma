@@ -7,13 +7,11 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
 from guardian.shortcuts import get_objects_for_user
+from utils.admin import file_admin
 from utils.permissions import get_all_group_object_permissions
 from utils.permissions import get_all_user_object_permissions
 
 from .models import BaseFile
-
-# disable deleting files through the admin for now
-admin.site.disable_action("delete_selected")
 
 
 @admin.register(BaseFile)
@@ -190,9 +188,9 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         """Return all defined permissions for this object."""
         output = ""
         for perm in get_all_user_object_permissions(obj):
-            output += f"user '{perm.user.username}' has '{perm.permission.codename}'<br>"
+            output += f"user '{perm.user.username}' has perm '{perm.permission.codename}'<br>"
         for perm in get_all_group_object_permissions(obj):
-            output += f"group '{perm.group}' has '{perm.permission.codename}'<br>"
+            output += f"group '{perm.group}' has perm '{perm.permission.codename}'<br>"
         return mark_safe(output)  # noqa: S308
 
     def downloads(self, obj: BaseFile) -> str:
@@ -211,3 +209,6 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
             return mark_safe(f'<a href="{obj.original.url}"><img src = "{obj.thumbnail_url}" width = "200"/></a>')  # noqa: S308
         except AttributeError:
             return ""
+
+# register the BaseFile model in the file_admin
+file_admin.register(BaseFile, BaseFileAdmin)

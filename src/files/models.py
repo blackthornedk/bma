@@ -102,6 +102,8 @@ class BaseFile(PolymorphicModel):
             ("unpublish_basefile", "Unpublish file"),
             ("publish_basefile", "Publish file"),
         )
+        verbose_name = "file"
+        verbose_name_plural = "files"
 
     objects = PolymorphicManager.from_queryset(BaseFileQuerySet)()
 

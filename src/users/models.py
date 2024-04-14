@@ -17,3 +17,15 @@ class User(AbstractUser):  # type: ignore[django-manager-missing]
     description = models.TextField(
         help_text="The description field of the user profile on the BornHack website.",
     )
+    is_bma_moderator = models.BooleanField(
+        help_text="User can approve/unapprove files in BMA",
+        default=False,
+    )
+    is_bma_creator = models.BooleanField(
+        help_text="User can upload files to BMA",
+        default=False,
+    )
+    is_bma_curator = models.BooleanField(
+        help_text="User can create albums and tag files in BMA",
+        default=False,
+    )

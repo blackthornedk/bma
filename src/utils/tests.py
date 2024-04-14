@@ -1,5 +1,4 @@
 """Unit tests base class."""
-from django.conf import settings
 import base64
 import hashlib
 import json
@@ -10,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs
 from urllib.parse import urlsplit
 
+from django.conf import settings
 from django.test import Client
 from django.test import TestCase
 from django.urls import reverse

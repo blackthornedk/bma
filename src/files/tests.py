@@ -1,7 +1,7 @@
 """Tests for the files API."""
-from django.conf import settings
 from pathlib import Path
 
+from django.conf import settings
 from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
 from oauth2_provider.models import get_application_model

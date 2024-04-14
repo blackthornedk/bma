@@ -5,12 +5,14 @@ from django.urls import include
 from django.urls import path
 from django.urls import re_path
 from files.views import bma_media_view
+from utils.admin import file_admin
 from utils.views import csrfview
 
 from .api import api_v1_json
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("manage/", file_admin.urls),
     path("accounts/", include("allauth.urls")),
     path("api/v1/json/", api_v1_json.urls),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
