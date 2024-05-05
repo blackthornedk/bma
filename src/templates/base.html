@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Untitled page{% endblock %} - BornHack Media Archive</title>
 
-    <!-- Bootstrap core CSS -->
+    <!-- Bootstrap CSS -->
     {% bootstrap_css %}
 
     <!-- FontAwesome CSS -->
@@ -28,7 +28,7 @@
     <!-- https://datatables.net/ -->
     <script src="{% static "js/vendor/jquery.dataTables.1.12.1.min.js" %}"></script>
 
-    <!-- bootstrap -->
+    <!-- bootstrap JS -->
     {% bootstrap_javascript %}
 
     <!-- htmx -->
@@ -67,50 +67,30 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarCollapse">
               <ul class="navbar-nav me-auto mb-2 mb-md-0">
-                <li class="nav-item">
-                  {% if request.resolver_match.url_name == "frontpage" %}
-                    <a class="nav-link active" aria-current="page" href="{% url 'frontpage:frontpage' %}">Frontpage</a>
-                  {% else %}
-                    <a class="nav-link" href="{% url 'frontpage:frontpage' %}">Frontpage</a>
-                  {% endif %}
-                </li>
+                  {# frontpage / files / albums #}
+                <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == "frontpage" %} active{% endif %}" aria-current="page" href="{% url 'frontpage:frontpage' %}">Frontpage</a></li>
+                <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == "file_list" %} active{% endif %}" href="{% url 'files:file_list' %}">Files</a></li>
 
-                <li class="nav-item">
-                  {% if request.resolver_match.url_name == "browse" %}
-                    <a class="nav-link active" aria-current="page" href="{% url 'files:browse' %}">File Browser</a>
-                  {% else %}
-                    <a class="nav-link" href="{% url 'files:browse' %}">File Browser</a>
-                  {% endif %}
-                </li>
-
+                {# upload / manage links #}
                 {% if not user.is_anonymous %}
-                  <li class="nav-item dropdown">
-                    <a href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" class="nav-link dropdown-toggle active">
-                      File manager
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-                      <li><a class="dropdown-item" href="{% url 'admin:index' %}">Manage</a></li>
-                      <li><a class="dropdown-item" href="{% url 'files:upload' %}">Upload</a></li>
-                    </ul>
-                  </li>
+                  {% if user.is_creator %}
+                  <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == "upload" %} active{% endif %}" href="{% url 'files:upload' %}">Upload</a></li>
+                  {% endif %}
+                  {% if user.is_creator or user.is_moderator %}
+                  <li class="nav-item"><a class="nav-link" href="{% url 'file_admin:files_basefile_changelist' %}">Manage</a></li>
+                  {% endif %}
                 {% endif %}
 
+                {# django admin #}
+                {% if user.is_staff %}
+                <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Django Admin</a></li>
+                {% endif %}
+
+                {# login / logout link #}
                 {% if user.is_anonymous %}
-                  <li class="nav-item">
-                    {% if request.resolver_match.url_name == "account_login" %}
-                      <a class="nav-link active" aria-current="page" href="{% url 'account_login' %}">Login</a>
-                    {% else %}
-                      <a class="nav-link" href="{% url 'account_login' %}">Login</a>
-                    {% endif %}
-                  </li>
+                <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == "account_login" %} active{% endif %}" href="{% url 'account_login' %}">Login</a></li>
                 {% else %}
-                  <li class="nav-item">
-                    {% if request.resolver_match.url_name == "account_logout" %}
-                      <a class="nav-link active" aria-current="page" href="{% url 'account_logout' %}">Logout</a>
-                    {% else %}
-                      <a class="nav-link" href="{% url 'account_logout' %}">Logout</a>
-                    {% endif %}
-                  </li>
+                <li class="nav-item"><a class="nav-link{% if request.resolver_match.url_name == "account_logout" %} active{% endif %}" href="{% url 'account_logout' %}">Logout</a></li>
                 {% endif %}
 
               </ul>

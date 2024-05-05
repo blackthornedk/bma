@@ -118,7 +118,7 @@ class BaseFile(PolymorphicModel):
         help_text="The unique ID (UUID4) of this object.",
     )
 
-    owner = models.ForeignKey(
+    uploader = models.ForeignKey(
         "users.User",
         on_delete=models.SET(get_sentinel_user),
         related_name="files",
@@ -146,7 +146,7 @@ class BaseFile(PolymorphicModel):
         help_text="The description of this work. Optional. Supports markdown.",
     )
 
-    source = models.URLField(
+    original_source = models.URLField(
         help_text="The URL to the original source of this work. "
         "Leave blank to consider the BMA URL the original source.",
         blank=True,
@@ -204,6 +204,21 @@ class BaseFile(PolymorphicModel):
     def status_icon(self) -> str:
         """Status icon."""
         return settings.FILESTATUS_ICONS[self.status]
+
+    @property
+    def license_name(self) -> str:
+        """Get license_name."""
+        return str(getattr(LicenseChoices, self.license).label)
+
+    @property
+    def license_url(self) -> str:
+        """Get license_url."""
+        return license_urls[self.license]
+
+    @property
+    def source(self) -> str:
+        """Consider the BMA canonical URL the source if no other source has been specified."""
+        return self.original_source if self.original_source else self.get_absolute_url()
 
     def get_absolute_url(self) -> str:
         """The detail url for the file."""
@@ -271,15 +286,15 @@ class BaseFile(PolymorphicModel):
         return 1
 
     def approve(self) -> int:
-        """Approve this file and add publish/unpublish permissions to the owner."""
-        assign_perm("publish_basefile", self.owner, self)
-        assign_perm("unpublish_basefile", self.owner, self)
+        """Approve this file and add publish/unpublish permissions to the uploader."""
+        assign_perm("publish_basefile", self.uploader, self)
+        assign_perm("unpublish_basefile", self.uploader, self)
         return self.unpublish()
 
     def unapprove(self) -> int:
-        """Unapprove this file and remove publish/unpublish permissions to the owner."""
-        remove_perm("publish_basefile", self.owner, self)
-        remove_perm("unpublish_basefile", self.owner, self)
+        """Unapprove this file and remove publish/unpublish permissions from the uploader."""
+        remove_perm("publish_basefile", self.uploader, self)
+        remove_perm("unpublish_basefile", self.uploader, self)
         return self.update_status(new_status="PENDING_MODERATION")
 
     def publish(self) -> int:
@@ -292,10 +307,10 @@ class BaseFile(PolymorphicModel):
 
     def add_initial_permissions(self) -> None:
         """Add initial permissions for newly uploaded files."""
-        # add owner permissions
-        assign_perm("view_basefile", self.owner, self)
-        assign_perm("change_basefile", self.owner, self)
-        assign_perm("delete_basefile", self.owner, self)
+        # add uploader permissions
+        assign_perm("view_basefile", self.uploader, self)
+        assign_perm("change_basefile", self.uploader, self)
+        assign_perm("delete_basefile", self.uploader, self)
         moderators, created = Group.objects.get_or_create(name=settings.BMA_MODERATOR_GROUP_NAME)
         if created:
             logger.debug("Created new group 'moderators'")

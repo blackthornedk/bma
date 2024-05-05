@@ -9,5 +9,5 @@ def get_upload_path(instance: BaseFile, filename: str) -> Path:
     # return something like
     # user_dbd9d175-7a54-4339-b46d-de87791cb188/picture/bma_picture_6fcfaf74-3b39-4443-889e-93fc7bf8627b.jpg
     return Path(
-        f"user_{instance.owner.uuid}/{instance.filetype}/bma_{instance.filetype}_{instance.uuid}{Path(filename).suffix.lower()}",
+        f"user_{instance.uploader.uuid}/{instance.filetype}/bma_{instance.filetype}_{instance.uuid}{Path(filename).suffix.lower()}",
     )

@@ -13,7 +13,6 @@ from files.models import BaseFile
 from files.models import StatusChoices
 
 from .models import LicenseChoices
-from .models import license_urls
 
 
 class UploadRequestSchema(ModelSchema):
@@ -22,7 +21,7 @@ class UploadRequestSchema(ModelSchema):
     license: LicenseChoices
     title: str = ""
     description: str = ""
-    source: str = ""
+    original_source: str = ""
     thumbnail_url: str = ""
 
     class Config:
@@ -34,7 +33,7 @@ class UploadRequestSchema(ModelSchema):
             "attribution",
             "title",
             "description",
-            "source",
+            "original_source",
             "thumbnail_url",
         )
 
@@ -44,7 +43,7 @@ class FileUpdateRequestSchema(ModelSchema):
 
     title: str | None = ""
     description: str | None = ""
-    source: str | None = ""
+    original_source: str | None = ""
     attribution: str | None = ""
     thumbnail_url: str | None = ""
 
@@ -55,7 +54,7 @@ class FileUpdateRequestSchema(ModelSchema):
         model_fields = (
             "title",
             "description",
-            "source",
+            "original_source",
             "attribution",
             "thumbnail_url",
         )
@@ -84,6 +83,7 @@ class FileResponseSchema(ModelSchema):
     links: dict[str, str | dict[str, str]]
     filetype: str
     filetype_icon: str
+    source: str
     status: str
     status_icon: str
     size_bytes: int
@@ -97,7 +97,7 @@ class FileResponseSchema(ModelSchema):
         model = BaseFile
         model_fields = (
             "uuid",
-            "owner",
+            "uploader",
             "created",
             "updated",
             "title",
@@ -105,7 +105,6 @@ class FileResponseSchema(ModelSchema):
             "license",
             "attribution",
             "status",
-            "source",
             "original_filename",
             "thumbnail_url",
         )
@@ -141,21 +140,6 @@ class FileResponseSchema(ModelSchema):
     def resolve_permissions(obj: BaseFile, context: dict[str, HttpRequest]) -> ObjectPermissionSchema:
         """Get the value for the permissions field with all file permissions."""
         return get_object_permissions_schema(obj, context["request"])
-
-    @staticmethod
-    def resolve_license_name(obj: BaseFile, context: dict[str, HttpRequest]) -> str:
-        """Get the value for the license_name field."""
-        return str(getattr(LicenseChoices, obj.license).label)
-
-    @staticmethod
-    def resolve_license_url(obj: BaseFile, context: dict[str, HttpRequest]) -> str:
-        """Get the value for the license_url field."""
-        return license_urls[obj.license]
-
-    @staticmethod
-    def resolve_source(obj: BaseFile, context: dict[str, HttpRequest]) -> str:
-        """Consider the BMA canonical URL the source if no other source has been specified."""
-        return obj.source if obj.source else obj.get_absolute_url()
 
 
 class SingleFileResponseSchema(ApiResponseSchema):

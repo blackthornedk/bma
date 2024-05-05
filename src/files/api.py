@@ -5,6 +5,7 @@ import uuid
 import magic
 from audios.models import Audio
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -53,6 +54,11 @@ query: Query = Query(...)  # type: ignore[type-arg]
 )
 def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema) -> FileApiResponseType:
     """API endpoint for file uploads."""
+    # make sure the uploading user is in the creators group
+    creator_group, created = Group.objects.get_or_create(name=settings.BMA_CREATOR_GROUP_NAME)
+    if creator_group not in request.user.groups.all():  # type: ignore[union-attr]
+        return 403, ApiMessageSchema(message="Missing upload permissions")
+
     # find the filetype using libmagic by reading the first bit of the file
     mime = magic.from_buffer(f.read(512), mime=True)
 
@@ -68,7 +74,7 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
         return 422, ApiMessageSchema(message="File type not supported")
 
     uploaded_file = Model(
-        owner=request.user,  # type: ignore[misc]
+        uploader=request.user,  # type: ignore[misc]
         original=f,
         original_filename=str(f.name),
         file_size=f.size,
@@ -145,8 +151,8 @@ def file_list(request: HttpRequest, filters: FileFilters = query) -> FileApiResp
                 query |= Q(instance_of=Document)
         files = files.filter(query)
 
-    if filters.owners:
-        files = files.filter(owner__in=filters.owners)
+    if filters.uploaders:
+        files = files.filter(uploader__in=filters.uploaders)
 
     if filters.licenses:
         files = files.filter(license__in=filters.licenses)

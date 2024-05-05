@@ -85,16 +85,16 @@ class TestFilesApi(ApiTestBase):
         assert response.json()["bma_response"][0]["title"] == "title5"
         assert response.json()["bma_response"][4]["title"] == "title9"
 
-        # test owner filter
+        # test uploader filter
         response = self.client.get(
             reverse("api-v1-json:file_list"),
-            data={"owners": [self.creator2.uuid, self.user0.uuid]},
+            data={"uploaders": [self.creator2.uuid, self.user0.uuid]},
             headers={"authorization": self.creator2.auth},
         )
         assert len(response.json()["bma_response"]) == 15
         response = self.client.get(
             reverse("api-v1-json:file_list"),
-            data={"owners": [self.user0.uuid]},
+            data={"uploaders": [self.user0.uuid]},
             headers={"authorization": self.creator2.auth},
         )
         assert len(response.json()["bma_response"]) == 0
@@ -422,7 +422,7 @@ class TestFilesApi(ApiTestBase):
         # update instead of replace, first with invalid source url
         response = self.client.patch(
             reverse("api-v1-json:file_get", kwargs={"file_uuid": self.file_uuid}),
-            {"source": "outer space"},
+            {"original_source": "outer space"},
             headers={"authorization": self.creator2.auth},
             content_type="application/json",
         )
@@ -430,7 +430,7 @@ class TestFilesApi(ApiTestBase):
         # then with a valid url
         response = self.client.patch(
             reverse("api-v1-json:file_get", kwargs={"file_uuid": self.file_uuid}),
-            {"source": "https://example.com/foo.png"},
+            {"original_source": "https://example.com/foo.png"},
             headers={"authorization": self.creator2.auth},
             content_type="application/json",
         )
@@ -634,7 +634,7 @@ class FileAdminTests(ApiTestBase):
         # upload some files
         self.files = [self.file_upload() for _ in range(10)]
         for _ in range(10):
-            self.files.append(self.file_upload(owner="creator3"))
+            self.files.append(self.file_upload(uploader="creator3"))
 
         # the superuser can see all files
         url = reverse("file_admin:files_basefile_changelist")

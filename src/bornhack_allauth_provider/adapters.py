@@ -1,11 +1,14 @@
 """The BornHackSocialAccountAdapter takes care of populating fields in the BMA User model from the BornHack profile."""
+
 from allauth.account.utils import user_field
 from allauth.account.utils import user_username
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.models import SocialLogin
 from django.conf import settings
 from django.contrib.auth.models import Group
+from django.forms import Form
 from django.http import HttpRequest
+from users.models import User
 
 
 class BornHackSocialAccountAdapter(DefaultSocialAccountAdapter):
@@ -26,8 +29,12 @@ class BornHackSocialAccountAdapter(DefaultSocialAccountAdapter):
         # set description on the user object
         user_field(sociallogin.user, "description", data.get("description"))
 
+        return sociallogin.user
+
+    def save_user(self, request: HttpRequest, sociallogin: SocialLogin, form: Form | None = None) -> User:
+        """Called on first login with a BornHack socialaccount."""
+        user = super().save_user(request, sociallogin, form)
         # add to curators group
         curators, created = Group.objects.get_or_create(name=settings.BMA_CURATOR_GROUP_NAME)
-        curators.user_set.add(sociallogin.user)
-
-        return sociallogin.user
+        curators.user_set.add(user)
+        return user  # type: ignore[no-any-return]

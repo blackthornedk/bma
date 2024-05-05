@@ -18,11 +18,10 @@ from .models import BaseFile
 class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
     """The ModelAdmin class to manage files. Used by the regular admin and FileAdmin."""
 
-    readonly_fields = ("status", "original_filename", "file_size", "license", "owner")
-
+    readonly_fields = ("status", "original_filename", "file_size", "license", "uploader")
     list_display = (
         "uuid",
-        "owner",
+        "uploader",
         "thumbnail",
         "downloads",
         "permissions",
@@ -33,8 +32,7 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         "attribution",
         "status",
     )
-    list_filter = ("license", "status")
-
+    list_filter = ("license", "status", "uploader", "attribution")
     actions = ("approve", "unapprove", "publish", "unpublish")
 
     def get_actions(self, request: HttpRequest) -> dict[str, tuple[Callable[..., str], str, str] | None]:
@@ -208,7 +206,7 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
     def thumbnail(self, obj: BaseFile) -> str:
         """Return thumbnail html."""
         try:
-            return mark_safe(f'<a href="{obj.original.url}"><img src = "{obj.thumbnail_url}" width = "200"/></a>')  # noqa: S308
+            return mark_safe(f'<a href="{obj.original.url}"><img src = "{obj.thumbnail_url}" width = "100"></a>')  # noqa: S308
         except AttributeError:
             return ""
 

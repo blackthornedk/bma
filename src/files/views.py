@@ -7,6 +7,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import FileResponse
 from django.http import Http404
 from django.http import HttpRequest
@@ -14,10 +15,14 @@ from django.http import HttpResponse
 from django.views.generic import DetailView
 from django.views.generic import FormView
 from django.views.generic import TemplateView
-from users.models import User
+from django_filters.views import FilterView
+from django_tables2.views import SingleTableMixin
+from guardian.shortcuts import get_objects_for_user
 
-from files.forms import UploadForm
-from files.models import BaseFile
+from .filters import FileFilter
+from .forms import UploadForm
+from .models import BaseFile
+from .tables import FileTable
 
 logger = logging.getLogger("bma")
 
@@ -29,11 +34,36 @@ class FileUploadView(LoginRequiredMixin, FormView):  # type: ignore[type-arg]
     form_class = UploadForm
 
 
-class FileDetailView(LoginRequiredMixin, DetailView):  # type: ignore[type-arg]
-    """File detail view."""
+class FileListView(SingleTableMixin, FilterView):
+    """File list view."""
+
+    table_class = FileTable
+    template_name = "list.html"
+    filterset_class = FileFilter
+    context_object_name = "files"
+
+    def get_queryset(self) -> QuerySet[BaseFile]:
+        """Get files that are PUBLISHED or where the current user has view_basefile perms."""
+        files = BaseFile.objects.filter(status="PUBLISHED") | get_objects_for_user(
+            self.request.user,
+            "files.view_basefile",
+        )
+        return files.distinct()  # type: ignore[no-any-return]
+
+
+class FileDetailView(DetailView):  # type: ignore[type-arg]
+    """File detail view. Shows a single file."""
 
     template_name = "detail.html"
     model = BaseFile
+
+    def get_object(self, queryset: QuerySet[BaseFile] | None = None) -> BaseFile:
+        """Check permissions before returning the file."""
+        basefile = super().get_object(queryset=queryset)
+        if not self.request.user.has_perm("files.view_basefile", basefile) and basefile.status != "PUBLISHED":
+            # file is not PUBLISHED, and the current user does not have permissions to view this file
+            raise PermissionDenied
+        return basefile  # type: ignore[no-any-return]
 
 
 def bma_media_view(request: HttpRequest, path: str, *, accel: bool) -> FileResponse | HttpResponse:
@@ -58,10 +88,8 @@ def bma_media_view(request: HttpRequest, path: str, *, accel: bool) -> FileRespo
         raise Http404 from e
 
     # check file permissions
-    if not request.user.has_perm("files.view_basefile", dbfile) and not User.get_anonymous().has_perm(  # type: ignore[attr-defined]
-        "files.view_basefile", dbfile
-    ):
-        # neither the current user nor the anonymous user has permissions to view this file
+    if not request.user.has_perm("files.view_basefile", dbfile) and dbfile.status != "PUBLISHED":
+        # file is not PUBLISHED and the current user does not have permissions to view this file
         raise PermissionDenied
 
     # check if the file exists in the filesystem

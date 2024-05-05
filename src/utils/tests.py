@@ -127,12 +127,12 @@ class ApiTestBase(TestCase):
     def file_upload(  # noqa: PLR0913
         self,
         *,
-        owner: str = "creator2",
+        uploader: str = "creator2",
         filepath: str = settings.BASE_DIR / "static_src/images/logo_wide_black_500_RGB.png",
         title: str = "some title",
         file_license: str = "CC_ZERO_1_0",
         attribution: str = "fotoarne",
-        source: str = "https://example.com/something.png",
+        original_source: str = "https://example.com/something.png",
         thumbnail_url: str = "",
         return_full: bool = False,
         expect_status_code: int = 201,
@@ -142,7 +142,7 @@ class ApiTestBase(TestCase):
             "title": title,
             "license": file_license,
             "attribution": attribution,
-            "source": source,
+            "original_source": original_source,
         }
         if thumbnail_url:
             metadata["thumbnail_url"] = thumbnail_url
@@ -153,7 +153,7 @@ class ApiTestBase(TestCase):
                     "f": f,
                     "metadata": json.dumps(metadata),
                 },
-                headers={"authorization": getattr(self, owner).auth},
+                headers={"authorization": getattr(self, uploader).auth},
             )
         assert response.status_code == expect_status_code
         if expect_status_code == 422:
@@ -165,7 +165,7 @@ class ApiTestBase(TestCase):
         assert data["title"] == title
         assert data["attribution"] == attribution
         assert data["license"] == file_license
-        assert data["source"] == source
+        assert data["source"] == original_source
         self.file_uuid = data["uuid"]
         if return_full:
             return data

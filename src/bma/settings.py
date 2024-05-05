@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
     "django.contrib.postgres",
+    "django.contrib.humanize",
     # deps
     "allauth",
     "allauth.account",
@@ -44,6 +45,8 @@ INSTALLED_APPS = [
     "oauth2_provider",
     "guardian",
     "corsheaders",
+    "django_filters",
+    "django_tables2",
     # bma apps
     "bornhack_allauth_provider",
     "users",
@@ -216,3 +219,25 @@ IMAGEKIT_SPEC_CACHEFILE_NAMER = "imagekit.cachefiles.namers.source_name_dot_hash
 CSRF_USE_SESSIONS = True
 CSRF_COOKIE_SECURE = not DEBUG  # noqa: F405
 SESSION_COOKIE_SECURE = not DEBUG  # noqa: F405
+
+if DEBUG:  # noqa: F405
+    INSTALLED_APPS.append("debug_toolbar")
+    MIDDLEWARE = ["debug_toolbar.middleware.DebugToolbarMiddleware", *MIDDLEWARE]
+    INTERNAL_IPS = [
+        "127.0.0.1",
+    ]
+
+DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap5.html"
+
+BOOTSTRAP5 = {
+    "css_url": {
+        "url": "/static/css/vendor/bootstrap-v5.2.3.min.css",
+        "integrity": "sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65",
+        "crossorigin": "anonymous",
+    },
+    "javascript_url": {
+        "url": "/static/js/vendor/bootstrap-v5.2.3.min.js",
+        "integrity": "sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4",
+        "crossorigin": "anonymous",
+    },
+}
