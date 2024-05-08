@@ -45,8 +45,11 @@ def album_create(request: HttpRequest, payload: AlbumRequestSchema) -> AlbumApiR
             album.files.set(v)
         else:
             setattr(album, k, v)
+
+    # set album owner
     album.owner = request.user  # type: ignore[assignment]
 
+    # validate everything
     try:
         album.full_clean()
     except ValidationError:
@@ -154,17 +157,31 @@ def album_update(
         del data["files"]
         Album.objects.filter(uuid=album.uuid).update(**data)
         album.refresh_from_db()
+        if "files" in payload.dict():
+            # we are updating the list of files, get a list of current and new file uuids
+            current_uuids = set(album.files.values_list("uuid", flat=True))
+            new_uuids = set(payload.dict()["files"])
+            # get the list to be removed from the album
+            remove_uuids = list(current_uuids.difference(new_uuids))
+            album.remove_members(remove_uuids)
+            # get the list of files to be added to the album
+            add_uuids = new_uuids.difference(current_uuids)
+            for file_uuid in add_uuids:
+                album.files.add(file_uuid)
     else:
         # we are replacing the object, we do want defaults for absent fields
         for attr, value in payload.dict(exclude_unset=False).items():
             if attr == "files":
-                # handle the m2m seperate
+                # end all current memberships
+                current_uuids = album.files.values_list("uuid", flat=True)
+                album.remove_members(list(current_uuids))
+                # add the new memberships
+                for file_uuid in value:
+                    album.files.add(file_uuid)
                 continue
             # set the attribute on the album
             setattr(album, attr, value)
         album.save()
-    if "files" in payload.dict():
-        album.files.set(payload.dict()["files"])
     return 200, {"bma_response": album}
 
 
@@ -184,5 +201,6 @@ def album_delete(
     if check:
         # check mode requested, don't change anything
         return 202, ApiMessageSchema(message="OK")
-    album.delete()
+    album.deleted = True
+    album.save(update_fields=["deleted"])
     return 204, None

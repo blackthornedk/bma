@@ -1,8 +1,14 @@
 """The album model."""
 import uuid
 
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateTimeRangeField
+from django.contrib.postgres.fields import RangeOperators
 from django.db import models
+from django.db.models import F
+from django.utils import timezone
 from files.models import BaseFile
+from psycopg2.extras import DateTimeTZRange
 from taggit.managers import TaggableManager
 from users.sentinel import get_sentinel_user
 from utils.models import UUIDTaggedItem
@@ -57,6 +63,11 @@ class Album(models.Model):
         related_name="albums",
     )
 
+    deleted = models.BooleanField(
+        default=False,
+        help_text="Set true to mark album as deleted.",
+    )
+
     class Meta:
         """Order by created date initially."""
 
@@ -65,6 +76,17 @@ class Album(models.Model):
     def __str__(self) -> str:
         """The string representation of an album."""
         return f"{self.title} ({self.uuid})"
+
+    def remove_members(self, file_uuids: list[str]) -> None:
+        """End the memberships for the file_uuids."""
+        for membership in self.memberships.filter(basefile__uuid__in=file_uuids):
+            membership.period = DateTimeTZRange(membership.period.lower, timezone.now())
+            membership.save(update_fields=["period"])
+
+
+def from_now_to_forever() -> DateTimeTZRange:
+    """Return a DateTimeTZRange starting now and never stopping."""
+    return DateTimeTZRange(timezone.now(), None)
 
 
 class AlbumMember(models.Model):
@@ -76,19 +98,32 @@ class AlbumMember(models.Model):
         editable=False,
         help_text="The unique ID (UUID4) of this object.",
     )
-    basefile = models.ForeignKey(BaseFile, on_delete=models.CASCADE)
 
-    album = models.ForeignKey(Album, on_delete=models.CASCADE)
+    # if the basefile object gets deleted from database also delete the AlbumMember
+    basefile = models.ForeignKey(BaseFile, related_name="memberships", on_delete=models.CASCADE)
 
-    created = models.DateTimeField(
-        auto_now_add=True,
-        help_text="The date and time when this file was first added to the album.",
+    # if the album object gets deleted from database also delete the AlbumMembers
+    album = models.ForeignKey(Album, related_name="memberships", on_delete=models.CASCADE)
+
+    period = DateTimeRangeField(
+        default=from_now_to_forever,
+        help_text="The time range of this album membership. End time can be blank.",
     )
 
-    updated = models.DateTimeField(
-        auto_now=True,
-        help_text="The date and time when this object was last updated.",
-    )
+    class Meta:
+        """Add ExclusionConstraints preventing overlaps and adjacent ranges with same availability."""
+
+        constraints = (
+            # we do not want overlapping memberships
+            ExclusionConstraint(
+                name="prevent_membership_overlaps",
+                expressions=[
+                    (F("basefile"), RangeOperators.EQUAL),
+                    (F("album"), RangeOperators.EQUAL),
+                    ("period", RangeOperators.OVERLAPS),
+                ],
+            ),
+        )
 
     def __str__(self) -> str:
         """The string representation of an album member file."""
