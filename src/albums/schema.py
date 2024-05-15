@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
-from django.utils import timezone
 from files.models import BaseFile
 from ninja import ModelSchema
 from utils.schema import ApiResponseSchema
@@ -59,7 +58,7 @@ class AlbumResponseSchema(ModelSchema):
     @staticmethod
     def resolve_files(obj: Album, context: dict[str, HttpRequest]) -> QuerySet[BaseFile]:
         """Only get active memberships."""
-        return obj.files.filter(memberships__period__contains=timezone.now())
+        return obj.active_files().all()
 
 
 class SingleAlbumResponseSchema(ApiResponseSchema):

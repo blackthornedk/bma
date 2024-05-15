@@ -159,29 +159,28 @@ def album_update(
         album.refresh_from_db()
         if "files" in payload.dict():
             # we are updating the list of files, get a list of current and new file uuids
-            current_uuids = set(album.files.values_list("uuid", flat=True))
+            current_uuids = set(album.active_files().values_list("uuid", flat=True))
             new_uuids = set(payload.dict()["files"])
             # get the list to be removed from the album
             remove_uuids = list(current_uuids.difference(new_uuids))
             album.remove_members(remove_uuids)
             # get the list of files to be added to the album
             add_uuids = new_uuids.difference(current_uuids)
-            for file_uuid in add_uuids:
-                album.files.add(file_uuid)
+            album.add_members(file_uuids=list(add_uuids))
     else:
         # we are replacing the object, we do want defaults for absent fields
         for attr, value in payload.dict(exclude_unset=False).items():
             if attr == "files":
                 # end all current memberships
-                current_uuids = album.files.values_list("uuid", flat=True)
+                current_uuids = album.active_files().values_list("uuid", flat=True)
                 album.remove_members(list(current_uuids))
                 # add the new memberships
-                for file_uuid in value:
-                    album.files.add(file_uuid)
+                album.add_members(file_uuids=value)
                 continue
             # set the attribute on the album
             setattr(album, attr, value)
         album.save()
+        album.refresh_from_db()
     return 200, {"bma_response": album}
 
 

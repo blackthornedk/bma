@@ -1,4 +1,6 @@
 """The album model."""
+import datetime
+import logging
 import uuid
 
 from django.contrib.postgres.constraints import ExclusionConstraint
@@ -6,12 +8,15 @@ from django.contrib.postgres.fields import DateTimeRangeField
 from django.contrib.postgres.fields import RangeOperators
 from django.db import models
 from django.db.models import F
+from django.db.models import QuerySet
 from django.utils import timezone
 from files.models import BaseFile
 from psycopg2.extras import DateTimeTZRange
 from taggit.managers import TaggableManager
 from users.sentinel import get_sentinel_user
 from utils.models import UUIDTaggedItem
+
+logger = logging.getLogger("bma")
 
 
 class Album(models.Model):
@@ -77,16 +82,41 @@ class Album(models.Model):
         """The string representation of an album."""
         return f"{self.title} ({self.uuid})"
 
+    def add_members(self, file_uuids: list[str]) -> None:
+        """Create new memberships for the file_uuids."""
+        files = BaseFile.objects.filter(uuid__in=file_uuids)
+        for u in file_uuids:
+            f = files.get(uuid=u)
+            member, created = AlbumMember.objects.get_or_create(
+                basefile=f,
+                album=self,
+                period__endswith=None,
+            )
+
     def remove_members(self, file_uuids: list[str]) -> None:
         """End the memberships for the file_uuids."""
-        for membership in self.memberships.filter(basefile__uuid__in=file_uuids):
+        for membership in self.memberships.filter(basefile__uuid__in=file_uuids, period__endswith__isnull=True):
             membership.period = DateTimeTZRange(membership.period.lower, timezone.now())
             membership.save(update_fields=["period"])
+
+    def active_files(self, when: datetime.datetime | None = None) -> QuerySet[BaseFile]:
+        """Return the active members of this album at a given time."""
+        if when is None:
+            when = timezone.now()
+        return self.files.filter(memberships__period__contains=when)
 
 
 def from_now_to_forever() -> DateTimeTZRange:
     """Return a DateTimeTZRange starting now and never stopping."""
     return DateTimeTZRange(timezone.now(), None)
+
+
+class ActiveAlbumMemberManager(models.Manager):  # type: ignore[type-arg]
+    """Filter away inactive album members."""
+
+    def get_queryset(self):  # type: ignore[no-untyped-def]  # noqa: ANN201
+        """Only get active memberships."""
+        return super().get_queryset().filter(memberships__period__contains=timezone.now())
 
 
 class AlbumMember(models.Model):
@@ -110,6 +140,9 @@ class AlbumMember(models.Model):
         help_text="The time range of this album membership. End time can be blank.",
     )
 
+    objects = models.Manager()  # Default Manager
+    active_members = ActiveAlbumMemberManager()
+
     class Meta:
         """Add ExclusionConstraints preventing overlaps and adjacent ranges with same availability."""
 
@@ -127,4 +160,8 @@ class AlbumMember(models.Model):
 
     def __str__(self) -> str:
         """The string representation of an album member file."""
-        return f"{self.basefile.uuid} is in album {self.album.uuid}"
+        if self.period.upper is not None:
+            return (
+                f"{self.basefile.uuid} was in album {self.album.uuid} from {self.period.lower} to {self.period.upper}"
+            )
+        return f"{self.basefile.uuid} is in album {self.album.uuid} from {self.period.lower}"
