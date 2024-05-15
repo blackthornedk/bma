@@ -21,6 +21,15 @@ class UploadForm(forms.ModelForm[BaseFile]):
         }
         widgets = {
             "license": forms.Select(attrs={"onchange": "enableUploadButton()"}),
-            "attribution": forms.TextInput(attrs={"placeholder": "Attribution",
-                                                  "onchange": "enableUploadButton()"}),
+            "attribution": forms.TextInput(attrs={"placeholder": "Attribution", "onchange": "enableUploadButton()"}),
         }
+
+
+class UpdateForm(forms.ModelForm[BaseFile]):
+    """The file update form."""
+
+    class Meta:
+        """Set model and fields."""
+
+        model = BaseFile
+        fields = ("title", "attribution", "description")

@@ -8,18 +8,24 @@ from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
+from django.forms import Form
 from django.http import FileResponse
 from django.http import Http404
 from django.http import HttpRequest
 from django.http import HttpResponse
+from django.http import HttpResponseRedirect
+from django.urls import reverse_lazy
+from django.views.generic import DeleteView
 from django.views.generic import DetailView
 from django.views.generic import FormView
 from django.views.generic import TemplateView
+from django.views.generic import UpdateView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from guardian.shortcuts import get_objects_for_user
 
 from .filters import FileFilter
+from .forms import UpdateForm
 from .forms import UploadForm
 from .models import BaseFile
 from .tables import FileTable
@@ -62,6 +68,35 @@ class FileDetailView(DetailView):  # type: ignore[type-arg]
         basefile = super().get_object(queryset=queryset)
         if not self.request.user.has_perm("files.view_basefile", basefile) and basefile.status != "PUBLISHED":
             # file is not PUBLISHED, and the current user does not have permissions to view this file
+            raise PermissionDenied
+        return basefile  # type: ignore[no-any-return]
+
+
+class FileDeleteView(DeleteView):  # type: ignore[type-arg]
+    """File delete view. Delete a single file."""
+
+    template_name = "delete.html"
+    model = BaseFile
+
+    def form_valid(self, form: Form) -> HttpResponseRedirect:
+        """Check permissions before soft deleting file."""
+        if not self.request.user.has_perm("files.delete_basefile", self.object):
+            raise PermissionDenied
+        self.object.update_status(new_status="PENDING_DELETION")
+        return HttpResponseRedirect(reverse_lazy("files:detail", kwargs={"pk": self.object.uuid}))
+
+
+class FileUpdateView(UpdateView):  # type: ignore[type-arg]
+    """File update view. Update a single files attributes."""
+
+    template_name = "update.html"
+    model = BaseFile
+    form_class = UpdateForm
+
+    def get_object(self, queryset: QuerySet[BaseFile] | None = None) -> BaseFile:
+        """Check permissions before returning the file."""
+        basefile = super().get_object(queryset=queryset)
+        if not self.request.user.has_perm("files.change_basefile", basefile):
             raise PermissionDenied
         return basefile  # type: ignore[no-any-return]
 
