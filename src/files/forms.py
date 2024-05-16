@@ -1,4 +1,6 @@
 """The file upload form."""
+from typing import ClassVar
+
 from django import forms
 from utils.filefield import MultipleFileField
 
@@ -15,11 +17,11 @@ class UploadForm(forms.ModelForm[BaseFile]):
 
         model = BaseFile
         fields = ("license", "attribution")
-        labels = {
+        labels: ClassVar[dict[str, str]] = {
             "license": "License *",
             "attribution": "Attribution *",
         }
-        widgets = {
+        widgets: ClassVar[dict[str, forms.Select | forms.TextInput]] = {
             "license": forms.Select(attrs={"onchange": "enableUploadButton()"}),
             "attribution": forms.TextInput(attrs={"placeholder": "Attribution", "onchange": "enableUploadButton()"}),
         }
