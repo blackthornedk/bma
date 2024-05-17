@@ -1,6 +1,7 @@
 """Tests for the files API."""
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
@@ -736,3 +737,98 @@ class FileAdminTests(ApiTestBase):
             response.content.decode(),
             msg_prefix=f"moderator {m} can not see 20 files pending moderation",
         )
+
+
+class FileViewTests(ApiTestBase):
+    """Unit tests for regular django views."""
+
+    def test_file_list_view(self) -> None:  # noqa: PLR0915
+        """Test the basics of the file list view."""
+        # upload some files as creator2
+        self.files = [self.file_upload() for _ in range(10)]
+        # upload some files as creator3
+        for _ in range(10):
+            self.files.append(self.file_upload(uploader="creator3"))
+
+        # the superuser can see all 20 files
+        url = reverse("files:file_list")
+        self.client.login(username="superuser", password="secret")
+        response = self.client.get(url)
+        content = response.content.decode()
+        soup = BeautifulSoup(content, "html.parser")
+        rows = soup.select("div.table-container > table > tbody > tr")
+        self.assertEqual(len(rows), len(self.files), "superuser can not see 20 files")
+
+        # anonymous can see 0 files
+        self.client.logout()
+        response = self.client.get(url)
+        content = response.content.decode()
+        soup = BeautifulSoup(content, "html.parser")
+        rows = soup.select("div.table-container > table > tbody > tr")
+        self.assertEqual(len(rows), 0, "anonymous user can not see 0 files")
+
+        # each creator can see 10 files
+        for c in ["creator2", "creator3"]:
+            self.client.login(username=c, password="secret")
+            response = self.client.get(url)
+            content = response.content.decode()
+            soup = BeautifulSoup(content, "html.parser")
+            rows = soup.select("div.table-container > table > tbody > tr")
+            self.assertEqual(len(rows), 10, f"creator {c} can not see 10 files")
+
+        # each moderator can see all 20 files
+        for m in ["moderator4", "moderator5"]:
+            self.client.login(username=m, password="secret")
+            response = self.client.get(url)
+            content = response.content.decode()
+            soup = BeautifulSoup(content, "html.parser")
+            rows = soup.select("div.table-container > table > tbody > tr")
+            self.assertEqual(len(rows), 20, f"moderator {m} can not see 20 files")
+
+        # each curator can see 0 files since none are approved yet
+        for m in ["curator6", "curator7"]:
+            self.client.login(username=m, password="secret")
+            response = self.client.get(url)
+            content = response.content.decode()
+            soup = BeautifulSoup(content, "html.parser")
+            rows = soup.select("div.table-container > table > tbody > tr")
+            self.assertEqual(len(rows), 0, f"curator {m} can not see 0 files")
+
+        # make moderator4 approve 5 of the files owned by creator2
+        adminurl = reverse("file_admin:files_basefile_changelist")
+        data = {"action": "approve", "_selected_action": self.files[:5]}
+        self.client.login(username="moderator4", password="secret")
+        response = self.client.post(adminurl, data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # test filtering by status to show the approved files
+        response = self.client.get(url + "?status=UNPUBLISHED")
+        content = response.content.decode()
+        soup = BeautifulSoup(content, "html.parser")
+        rows = soup.select("div.table-container > table > tbody > tr")
+        self.assertEqual(len(rows), 5, "filtering by status does not return 5 files")
+
+        # each curator can still see 0 files since none are published yet
+        for m in ["curator6", "curator7"]:
+            self.client.login(username=m, password="secret")
+            response = self.client.get(url)
+            content = response.content.decode()
+            soup = BeautifulSoup(content, "html.parser")
+            rows = soup.select("div.table-container > table > tbody > tr")
+            self.assertEqual(len(rows), 0, f"curator {m} can not see 0 files")
+
+        # make creator2 publish the 5 approved files
+        adminurl = reverse("file_admin:files_basefile_changelist")
+        data = {"action": "publish", "_selected_action": self.files[:5]}
+        self.client.login(username="creator2", password="secret")
+        response = self.client.post(adminurl, data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # each curator can now see 5 files
+        for m in ["curator6", "curator7"]:
+            self.client.login(username=m, password="secret")
+            response = self.client.get(url)
+            content = response.content.decode()
+            soup = BeautifulSoup(content, "html.parser")
+            rows = soup.select("div.table-container > table > tbody > tr")
+            self.assertEqual(len(rows), 5, f"curator {m} can not see 5 files")
