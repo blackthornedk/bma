@@ -132,7 +132,7 @@ def file_list(request: HttpRequest, filters: FileFilters = query) -> FileApiResp
     files = files.distinct()
 
     if filters.albums:
-        files = files.filter(albums__in=filters.albums)
+        files = files.filter(albums__in=filters.albums, albums__memberships__period__contains=timezone.now())
 
     if filters.statuses:
         files = files.filter(status__in=filters.statuses)

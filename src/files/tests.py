@@ -148,6 +148,25 @@ class TestFilesApi(ApiTestBase):
         )
         assert len(response.json()["bma_response"]) == 3
 
+        # update album by removing a file
+        response = self.client.patch(
+            reverse("api-v1-json:album_update", kwargs={"album_uuid": self.album_uuid}),
+            {
+                "files": files[4:6],
+            },
+            headers={"authorization": self.creator2.auth},
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+
+        # make sure only 2 files are returned now
+        response = self.client.get(
+            reverse("api-v1-json:file_list"),
+            data={"albums": [self.album_uuid]},
+            headers={"authorization": self.creator2.auth},
+        )
+        assert len(response.json()["bma_response"]) == 2
+
         # test file size filter
         response = self.client.get(
             reverse("api-v1-json:file_list"), data={"size": 9478}, headers={"authorization": self.creator2.auth}
