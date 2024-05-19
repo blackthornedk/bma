@@ -54,7 +54,7 @@ def album_create(request: HttpRequest, payload: AlbumRequestSchema) -> AlbumApiR
         album.full_clean()
     except ValidationError:
         logger.exception("validation failed")
-        return 422, ApiMessageSchema(message="Validation error")
+        return 422, {"message": "Validation error"}
 
     album.save()
 
@@ -146,10 +146,10 @@ def album_update(
     album = get_object_or_404(Album, uuid=album_uuid)
     if not request.user.has_perm("change_album", album):
         # no permission
-        return 403, ApiMessageSchema(message="Permission denied.")
+        return 403, {"message": "Permission denied."}
     if check:
         # check mode requested, don't change anything
-        return 202, ApiMessageSchema(message="OK")
+        return 202, {"message": "OK"}
     if request.method == "PATCH":
         # we are updating the object, we do not want defaults for absent fields
         data = payload.dict(exclude_unset=True)
@@ -191,15 +191,15 @@ def album_update(
 )
 def album_delete(
     request: HttpRequest, album_uuid: uuid.UUID, *, check: bool = False
-) -> tuple[int, ApiMessageSchema | None]:
+) -> tuple[int, dict[str, str] | None]:
     """Delete an album."""
     album = get_object_or_404(Album, uuid=album_uuid)
     if not request.user.has_perm("delete_album", album):
         # no permission
-        return 403, ApiMessageSchema(message="Permission denied.")
+        return 403, {"message": "Permission denied."}
     if check:
         # check mode requested, don't change anything
-        return 202, ApiMessageSchema(message="OK")
+        return 202, {"message": "OK"}
     album.deleted = True
     album.save(update_fields=["deleted"])
     return 204, None

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+{% block title %}Create/Update Album{% endblock title %}
+
+{% block content %}
+<div class="card">
+  <h5 class="card-header">Create/Update Album</h5>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      {% bootstrap_form form %}
+      <input type="submit" class="btn btn-success" value="Save">
+    </form>
+  </div>
+</div>
+{% endblock content %}

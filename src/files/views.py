@@ -44,16 +44,16 @@ class FileListView(SingleTableMixin, FilterView):
     """File list view."""
 
     table_class = FileTable
-    template_name = "list.html"
+    template_name = "file_list.html"
     filterset_class = FileFilter
     context_object_name = "files"
 
     def get_queryset(self) -> QuerySet[BaseFile]:
         """Get files that are PUBLISHED or where the current user has view_basefile perms."""
-        files = BaseFile.objects.filter(status="PUBLISHED") | get_objects_for_user(
+        files = BaseFile.objects.filter(status="PUBLISHED").prefetch_related("uploader") | get_objects_for_user(
             self.request.user,
             "files.view_basefile",
-        )
+        ).prefetch_related("uploader")
         return files.distinct()  # type: ignore[no-any-return]
 
 

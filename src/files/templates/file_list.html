@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load django_bootstrap5 %}
 {% load render_table from django_tables2 %}
+{% load querystring %}
+
 {% block title %}File list{% endblock title %}
 
 {% block content %}
@@ -20,6 +22,13 @@
       <div class="card">
         <h5 class="card-header">Files</h5>
         <div class="card-body">
+        <div class="lead">Per page:
+        <div class="btn-group" role="group" aria-label="Per page">
+          <a href="{% querystring per_page=25 %}" class="btn btn-outline-primary">25</a>
+          <a href="{% querystring per_page=100 %}" class="btn btn-outline-primary">100</a>
+          <a href="{% querystring per_page=250 %}" class="btn btn-outline-primary">250</a>
+        </div>
+        </div>
         {% render_table table %}
         </div>
       </div>

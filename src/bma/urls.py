@@ -18,6 +18,7 @@ urlpatterns = [
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     path("", include("frontpage.urls")),
     path("files/", include("files.urls", namespace="files")),
+    path("albums/", include("albums.urls", namespace="albums")),
     path("api/csrf/", csrfview),
     path("widgets/", include("widgets.urls", namespace="widgets")),
 ]

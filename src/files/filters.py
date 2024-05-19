@@ -3,6 +3,8 @@ import uuid
 from typing import ClassVar
 
 import django_filters
+from django.db.models import QuerySet
+from django.utils import timezone
 from utils.filters import ListFilters
 
 from .models import BaseFile
@@ -28,7 +30,12 @@ class FileFilters(ListFilters):
 class FileFilter(django_filters.FilterSet):
     """The main django-filters filter used in views showing files."""
 
-    not_albums = django_filters.filters.UUIDFilter(field_name="albums", exclude=True)
+    albums = django_filters.filters.UUIDFilter(field_name="albums", method="filter_albums")
+    not_albums = django_filters.filters.UUIDFilter(field_name="albums", method="filter_albums", exclude=True)
+
+    def filter_albums(self, queryset: QuerySet[BaseFile], name: str, value: str) -> QuerySet[BaseFile]:
+        """When filtering for albums only consider currently active memberships."""
+        return queryset.filter(memberships__album__in=[value], memberships__period__contains=timezone.now())
 
     class Meta:
         """Set model and fields."""

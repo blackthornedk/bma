@@ -39,10 +39,14 @@ class RequestMetadataSchema(Schema):
 class ApiMessageSchema(Schema):
     """The schema used for all API responses which are just messages."""
 
-    # https://github.com/bornhack/bma/issues/167
-    bma_request: RequestMetadataSchema = None  # type: ignore[assignment]
+    bma_request: RequestMetadataSchema
     message: str = "OK"
     details: dict[str, str] | None = None
+
+    @staticmethod
+    def resolve_bma_request(obj: dict[str, str], context: dict[str, HttpRequest]) -> RequestMetadataSchema:
+        """Populate and return a RequestMetadataSchema object for the bma_request field."""
+        return RequestMetadataSchema.construct()  # type: ignore[no-any-return]
 
 
 class ApiResponseSchema(ApiMessageSchema):

@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import RangeOperators
 from django.db import models
 from django.db.models import F
 from django.db.models import QuerySet
+from django.urls import reverse
 from django.utils import timezone
 from files.models import BaseFile
 from psycopg2.extras import DateTimeTZRange
@@ -81,6 +82,10 @@ class Album(models.Model):
     def __str__(self) -> str:
         """The string representation of an album."""
         return f"{self.title} ({self.uuid})"
+
+    def get_absolute_url(self) -> str:
+        """The detail url for the album."""
+        return reverse("albums:album_detail", kwargs={"pk": self.pk})
 
     def add_members(self, file_uuids: list[str]) -> None:
         """Create new memberships for the file_uuids."""

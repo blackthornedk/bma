@@ -57,7 +57,7 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
     # make sure the uploading user is in the creators group
     creator_group, created = Group.objects.get_or_create(name=settings.BMA_CREATOR_GROUP_NAME)
     if creator_group not in request.user.groups.all():  # type: ignore[union-attr]
-        return 403, ApiMessageSchema(message="Missing upload permissions")
+        return 403, {"message": "Missing upload permissions"}
 
     # find the filetype using libmagic by reading the first bit of the file
     mime = magic.from_buffer(f.read(512), mime=True)
@@ -71,7 +71,7 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
     elif mime in settings.ALLOWED_DOCUMENT_TYPES:
         from documents.models import Document as Model
     else:
-        return 422, ApiMessageSchema(message="File type not supported")
+        return 422, {"message": "File type not supported"}
 
     uploaded_file = Model(
         uploader=request.user,  # type: ignore[misc]
@@ -92,7 +92,7 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
     try:
         uploaded_file.full_clean()
     except ValidationError:
-        return 422, ApiMessageSchema(message="Validation error")
+        return 422, {"message": "Validation error"}
 
     # save everything
     uploaded_file.save()
@@ -132,7 +132,7 @@ def file_list(request: HttpRequest, filters: FileFilters = query) -> FileApiResp
     files = files.distinct()
 
     if filters.albums:
-        files = files.filter(albums__in=filters.albums, albums__memberships__period__contains=timezone.now())
+        files = files.filter(memberships__album__in=filters.albums, memberships__period__contains=timezone.now())
 
     if filters.statuses:
         files = files.filter(status__in=filters.statuses)
@@ -215,11 +215,9 @@ def api_file_action(  # noqa: PLR0913
     )
     if len(file_uuids) != db_files.count():
         errors = len(file_uuids) - db_files.count()
-        return 403, ApiMessageSchema(
-            message=f"Wrong status/no permission to {action} {errors} of {len(file_uuids)} files)"
-        )
+        return 403, {"message": f"Wrong status/no permission to {action} {errors} of {len(file_uuids)} files)"}
     if check:
-        return 202, ApiMessageSchema(message="OK")
+        return 202, {"message": "OK"}
     updated = getattr(db_files, action)()
     logger.debug(f"{action} {updated} OK")
     db_files = BaseFile.objects.filter(
@@ -431,7 +429,7 @@ def file_get(request: HttpRequest, file_uuid: uuid.UUID) -> FileApiResponseType:
         basefile,
     ):
         return 200, {"bma_response": basefile}
-    return 403, ApiMessageSchema(message="Permission denied.")
+    return 403, {"message": "Permission denied."}
 
 
 @router.put(
@@ -468,10 +466,10 @@ def file_update(
     """Update (PATCH) or replace (PUT) a file metadata object."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
     if not request.user.has_perm("change_basefile", basefile):
-        return 403, ApiMessageSchema(message="Permission denied.")
+        return 403, {"message": "Permission denied."}
     if check:
         # check mode requested, don't change anything
-        return 202, ApiMessageSchema(message="OK")
+        return 202, {"message": "OK"}
     if request.method == "PATCH":
         try:
             with transaction.atomic():
@@ -482,7 +480,7 @@ def file_update(
                 basefile.refresh_from_db()
                 basefile.full_clean()
         except ValidationError:
-            return 422, ApiMessageSchema(message="Validation error")
+            return 422, {"message": "Validation error"}
     else:
         try:
             with transaction.atomic():
@@ -493,7 +491,7 @@ def file_update(
                 basefile.refresh_from_db()
                 basefile.full_clean()
         except ValidationError:
-            return 422, ApiMessageSchema(message="Validation error")
+            return 422, {"message": "Validation error"}
     return 200, {"bma_response": basefile, "message": "File updated."}
 
 
@@ -510,14 +508,14 @@ def file_update(
 )
 def file_delete(
     request: HttpRequest, file_uuid: uuid.UUID, *, check: bool = False
-) -> tuple[int, ApiMessageSchema | None]:
+) -> tuple[int, dict[str, str] | None]:
     """Mark a file for deletion."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
     if not request.user.has_perm("delete_basefile", basefile):
-        return 403, ApiMessageSchema(message="Permission denied.")
+        return 403, {"message": "Permission denied."}
     if check:
         # check mode requested, don't change anything
-        return 202, ApiMessageSchema(message="OK")
+        return 202, {"message": "OK"}
     # ok go but we don't let users fully delete files for now
     basefile.update_status(new_status="PENDING_DELETION")
     return 204, None
