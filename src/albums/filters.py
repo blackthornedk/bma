@@ -3,6 +3,10 @@ import uuid
 from typing import ClassVar
 
 import django_filters
+from django.db.models import QuerySet
+from django.http import HttpRequest
+from django.utils import timezone
+from files.models import BaseFile
 from ninja import Field
 from utils.filters import ListFilters
 
@@ -10,20 +14,39 @@ from .models import Album
 
 
 class AlbumFilters(ListFilters):
-    """The filters used for the album_list endpoint."""
+    """The filters used for the album_list django-ninja API endpoint."""
 
     files: list[uuid.UUID] = Field(None, alias="files")
 
 
+def get_permitted_files(request: HttpRequest) -> QuerySet[BaseFile]:
+    """Called by AlbumFilter to get files for the albumlist filter multiselect form field."""
+    return BaseFile.permitted_files.get_queryset(user=request.user).all()
+
+
 class AlbumFilter(django_filters.FilterSet):
-    """The Album filter."""
+    """The Album filter used by django-filters."""
+
+    # when filtering by files only show files the user has permission for in the form
+    files = django_filters.filters.ModelMultipleChoiceFilter(
+        field_name="files",
+        queryset=get_permitted_files,
+        method="filter_files",
+    )
+
+    def filter_files(self, queryset: QuerySet[Album], name: str, value: str) -> QuerySet[Album]:
+        """When filtering by files only consider currently active memberships."""
+        # we want AND so loop over files and filter for each,
+        # finally returning only albums containing all the files in value
+        for f in value:
+            queryset = queryset.filter(memberships__basefile__in=[f], memberships__period__contains=timezone.now())
+        return queryset
 
     class Meta:
         """Set model and fields."""
 
         model = Album
         fields: ClassVar[dict[str, list[str]]] = {
-            "files": ["exact"],
             "title": ["exact", "icontains"],
             "description": ["icontains"],
         }

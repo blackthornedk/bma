@@ -623,7 +623,7 @@ class TestFilesApi(ApiTestBase):
         self.assertEqual(response.json()["bma_response"]["size_bytes"], 0)
 
 
-class FileAdminTests(ApiTestBase):
+class TestFileAdmin(ApiTestBase):
     """Tests for the FileAdmin."""
 
     def test_file_list_status_code(self) -> None:
@@ -758,7 +758,7 @@ class FileAdminTests(ApiTestBase):
         )
 
 
-class FileViewTests(ApiTestBase):
+class TestFileViews(ApiTestBase):
     """Unit tests for regular django views."""
 
     def test_file_list_view(self) -> None:  # noqa: PLR0915

@@ -170,3 +170,25 @@ class ApiTestBase(TestCase):
         if return_full:
             return data
         return data["uuid"]
+
+    def album_create(
+        self,
+        *,
+        title: str = "album title here",
+        description: str = "album description here",
+        files: list[str] | None = None,
+        creator: str = "curator6",
+    ) -> str:
+        """Create an album optionally with some files."""
+        response = self.client.post(
+            reverse("api-v1-json:album_create"),
+            {
+                "title": title,
+                "description": description,
+                "files": files if files else [],
+            },
+            headers={"authorization": getattr(self, creator).auth},
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        return response.json()["bma_response"]["uuid"]

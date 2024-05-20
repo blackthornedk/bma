@@ -11,6 +11,7 @@ from django.db import models
 from django.http import HttpRequest
 from django.urls import reverse
 from guardian.shortcuts import assign_perm
+from guardian.shortcuts import get_objects_for_user
 from guardian.shortcuts import remove_perm
 from polymorphic.managers import PolymorphicQuerySet
 from polymorphic.models import PolymorphicManager
@@ -93,6 +94,20 @@ class BaseFileQuerySet(PolymorphicQuerySet):
         return updated
 
 
+class PermittedFilesManager(PolymorphicManager):
+    """A custom manager which only returns the files the user has access to."""
+
+    def get_queryset(self, user: User) -> models.QuerySet["BaseFile"]:  # type: ignore[valid-type]
+        """Return PUBLISHED files and files where the user has view_basefile perms."""
+        files = super().get_queryset().filter(status="PUBLISHED") | get_objects_for_user(
+            user=user,
+            perms="files.view_basefile",
+            klass=super().get_queryset(),
+        )
+        # do not return duplicates when a file is PUBLISHED and a user also has files.view_basefile
+        return files.distinct()  # type: ignore[no-any-return]
+
+
 class BaseFile(PolymorphicModel):
     """The polymorphic base model inherited by the Picture, Video, Audio, and Document models."""
 
@@ -110,6 +125,8 @@ class BaseFile(PolymorphicModel):
         verbose_name_plural = "files"
 
     objects = PolymorphicManager.from_queryset(BaseFileQuerySet)()
+
+    permitted_files = PermittedFilesManager()
 
     uuid = models.UUIDField(
         primary_key=True,

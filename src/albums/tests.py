@@ -1,4 +1,5 @@
 """Tests for the Album API."""
+from bs4 import BeautifulSoup
 from django.urls import reverse
 from oauth2_provider.models import get_access_token_model
 from oauth2_provider.models import get_application_model
@@ -20,18 +21,7 @@ class TestAlbumsApi(ApiTestBase):
         files: list[str] | None = None,
     ) -> None:
         """Test creating an album."""
-        response = self.client.post(
-            reverse("api-v1-json:album_create"),
-            {
-                "title": title,
-                "description": description,
-                "files": files if files else [],
-            },
-            headers={"authorization": self.curator6.auth},
-            content_type="application/json",
-        )
-        assert response.status_code == 201
-        self.album_uuid = response.json()["bma_response"]["uuid"]
+        self.album_uuid = self.album_create(title=title, description=description, files=files)
 
     def test_album_create_with_files(
         self,
@@ -42,7 +32,7 @@ class TestAlbumsApi(ApiTestBase):
         self.files = []
         for _ in range(10):
             self.files.append(self.file_upload())
-        self.test_album_create(title=title, description=description, files=self.files)
+        self.album_uuid = self.album_create(title=title, description=description, files=self.files)
 
     def test_album_update(self) -> None:
         """First replace then update."""
@@ -201,3 +191,41 @@ class TestAlbumsApi(ApiTestBase):
         assert response.status_code == 200
         assert len(response.json()["bma_response"]) == 5
         assert response.json()["bma_response"][0]["title"] == "album5"
+
+
+class TestAlbumViews(ApiTestBase):
+    """Unit tests for regular django Album views."""
+
+    def create_albums(self) -> None:
+        """Create som albums for testing."""
+        # upload some files as creator2
+        self.files = []
+        for _ in range(10):
+            self.files.append(self.file_upload())
+        # add them to an album created by creator6
+        self.album_uuid = self.album_create(title="creator2 files", files=self.files)
+        # upload some files as creator3
+        for _ in range(10):
+            self.files.append(self.file_upload(uploader="creator3"))
+        self.album_create(title="creator3 files", files=self.files[10:], creator="curator7")
+
+    def test_album_list_view(self) -> None:
+        """Test the basics of the album list view."""
+        url = reverse("albums:album_list")
+        self.create_albums()
+        self.client.login(username="creator2", password="secret")
+
+        # test listing both albums, no filters
+        response = self.client.get(url)
+        content = response.content.decode()
+        soup = BeautifulSoup(content, "html.parser")
+        rows = soup.select("div.table-container > table > tbody > tr")
+        self.assertEqual(len(rows), 2, "album list does not return 2 albums")
+
+        # test filtering by files to show albums containing a single file
+        url += f"?files={self.files[0]}"
+        response = self.client.get(url)
+        content = response.content.decode()
+        soup = BeautifulSoup(content, "html.parser")
+        rows = soup.select("div.table-container > table > tbody > tr")
+        self.assertEqual(len(rows), 1, "filtering by files does not return 1 album")

@@ -34,7 +34,7 @@ class FileFilter(django_filters.FilterSet):
     not_albums = django_filters.filters.UUIDFilter(field_name="albums", method="filter_albums", exclude=True)
 
     def filter_albums(self, queryset: QuerySet[BaseFile], name: str, value: str) -> QuerySet[BaseFile]:
-        """When filtering for albums only consider currently active memberships."""
+        """When filtering by albums only consider currently active memberships."""
         return queryset.filter(memberships__album__in=[value], memberships__period__contains=timezone.now())
 
     class Meta:

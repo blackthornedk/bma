@@ -19,7 +19,6 @@ class AlbumTable(tables.Table):
             "title",
             "description",
             "owner",
-            "files",
             "active_memberships",
             "historic_memberships",
             "future_memberships",

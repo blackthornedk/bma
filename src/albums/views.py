@@ -34,7 +34,7 @@ class AlbumListView(SingleTableMixin, FilterView):
     filterset_class = AlbumFilter
     context_object_name = "albums"
 
-    def get_table_data(self) -> QuerySet[Album]:
+    def get_queryset(self) -> QuerySet[Album]:
         """Add membership counts."""
         qs = super().get_queryset()
         active_memberships = Count("memberships", filter=Q(memberships__period__contains=timezone.now()))
