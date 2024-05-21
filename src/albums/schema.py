@@ -50,9 +50,10 @@ class AlbumResponseSchema(ModelSchema):
 
     @staticmethod
     def resolve_links(obj: Album, context: dict[str, HttpRequest]) -> dict[str, str | dict[str, str]]:
-        """For now only a self link for albums."""
+        """For now only a self and detail link for albums."""
         return {
             "self": reverse("api-v1-json:album_get", kwargs={"album_uuid": obj.uuid}),
+            "detail": reverse("albums:album_detail", kwargs={"pk": obj.uuid}),
         }
 
     @staticmethod

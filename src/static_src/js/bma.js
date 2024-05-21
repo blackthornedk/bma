@@ -170,6 +170,7 @@ async function uploadFiles() {
     metadata.license = license.options[license.selectedIndex].value;
     metadata.attribution = document.getElementById("id_attribution").value;
 
+    let file_ids = [];
     // loop over formdatas, add metadata to each, and submit each
     // TODO: batch into groups of some reasonable size
     console.log("looping over formdatas ...");
@@ -182,11 +183,46 @@ async function uploadFiles() {
         try {
             response = await uploadFile(fd);
             UpdateStatus(fd.digest, "check", "Upload OK - file UUID " + response.bma_response.uuid);
+            file_ids.push(response.bma_response.uuid)
         } catch (error) {
             UpdateStatus(fd.digest, "exclamation-times", "Upload error: " + error);
         }
     };
+    if (file_ids.length > 0) {
+        console.log("Uploaded " + file_ids.length  + " files successfully, creating album...");
+        albumresponse = await createAlbum(file_ids);
+        console.log(albumresponse);
+        window.location.href = albumresponse["bma_response"]["links"]["detail"];
+    }
 }
+
+async function createAlbum(file_ids, title, description) {
+    let now = new Date().toISOString();
+    if (title == null) {
+        title = "Uploaded-" + now;
+    }
+
+    if (description == null) {
+        description = "Uploaded-" + now;
+    }
+
+    response = await fetch('/api/v1/json/albums/create/', {
+        method: "POST",
+        headers: {
+            'X-CSRFToken': document.getElementsByName("csrfmiddlewaretoken")[0].value
+        },
+        body: JSON.stringify({
+            'title': title,
+            'description': description,
+            'files': file_ids,
+        }),
+    })
+    if (!response.ok) {
+        throw new Error("Response status " + response.status);
+    }
+    return response.json();
+}
+
 
 async function uploadFile(fd) {
     console.log("uploading " + fd.digest + "...");

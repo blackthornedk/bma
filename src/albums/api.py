@@ -42,9 +42,9 @@ def album_create(request: HttpRequest, payload: AlbumRequestSchema) -> AlbumApiR
     album = Album()
     for k, v in payload.dict().items():
         if k == "files":
-            album.files.set(v)
-        else:
-            setattr(album, k, v)
+            # handle m2m seperately
+            continue
+        setattr(album, k, v)
 
     # set album owner
     album.owner = request.user  # type: ignore[assignment]
@@ -56,7 +56,11 @@ def album_create(request: HttpRequest, payload: AlbumRequestSchema) -> AlbumApiR
         logger.exception("validation failed")
         return 422, {"message": "Validation error"}
 
+    # save album object to db
     album.save()
+    if "files" in payload.dict():
+        # save m2m
+        album.files.set(payload.dict()["files"])
 
     # assign permissions and return response
     assign_perm("change_album", request.user, album)
