@@ -81,13 +81,6 @@ FILETYPE_ICONS = {
 }
 
 # status icons
-FILESTATUS_ICONS = {
-    "PENDING_MODERATION": "fas fa-clock",
-    "UNPUBLISHED": "fas fa-cloud-arrow-down",
-    "PUBLISHED": "fas fa-cloud-arrow-up",
-    "PENDING_DELETION": "fas fa-thrash-clock",
-}
-
 DEFAULT_THUMBNAIL_URLS = {
     "basefile": "/static/images/file-solid.png",
     "picture": "/static/images/file-image-solid.png",

@@ -240,7 +240,14 @@ class TestFilesApi(ApiTestBase):
             reverse("api-v1-json:publish_file", kwargs={"file_uuid": files[0]}),
             headers={"authorization": self.creator2.auth},
         )
-        assert response.status_code == 403
+        assert response.status_code == 200
+
+        # attempt to unpublish a file before approval
+        response = self.client.patch(
+            reverse("api-v1-json:unpublish_file", kwargs={"file_uuid": files[0]}),
+            headers={"authorization": self.creator2.auth},
+        )
+        assert response.status_code == 200
 
         # approve the file without permission
         response = self.client.patch(
@@ -263,20 +270,13 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 200
 
-        # try again with wrong status
-        response = self.client.patch(
-            reverse("api-v1-json:approve_file", kwargs={"file_uuid": files[0]}),
-            headers={"authorization": self.superuser.auth},
-        )
-        assert response.status_code == 403
-
-        # now list UNPUBLISHED files
+        # now list unpublished files
         response = self.client.get(
             reverse("api-v1-json:file_list"),
-            data={"statuses": ["UNPUBLISHED"]},
+            data={"published": False},
             headers={"authorization": self.creator2.auth},
         )
-        assert len(response.json()["bma_response"]) == 1
+        assert len(response.json()["bma_response"]) == 15
 
         # publish a file, check mode
         response = self.client.patch(
@@ -481,8 +481,8 @@ class TestFilesApi(ApiTestBase):
         # this should fail because we did not add CSRF..
         assert response.status_code == 403
 
-    def test_file_delete(self) -> None:
-        """Test deleting a file."""
+    def test_file_softdelete(self) -> None:
+        """Test softdeleting a file."""
         self.file_upload()
         # test with no auth
         response = self.client.delete(
@@ -590,19 +590,10 @@ class TestFilesApi(ApiTestBase):
         )
         assert response.status_code == 200
 
-        # then try approving the same files again
-        response = self.client.patch(
-            reverse("api-v1-json:approve_files"),
-            {"files": files[0:5]},
-            headers={"authorization": self.superuser.auth},
-            content_type="application/json",
-        )
-        assert response.status_code == 403
-
-        # make sure files are now UNPUBLISHED
+        # make sure files are now approved
         response = self.client.get(
             reverse("api-v1-json:file_list"),
-            data={"statuses": ["UNPUBLISHED"]},
+            data={"approved": True},
             headers={"authorization": self.creator2.auth},
         )
         assert len(response.json()["bma_response"]) == 5
@@ -649,7 +640,7 @@ class TestFileAdmin(ApiTestBase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
 
-    def test_file_list_html(self) -> None:
+    def test_file_list(self) -> None:
         """Test the file list page in the FileAdmin."""
         # upload some files
         self.files = [self.file_upload() for _ in range(10)]
@@ -695,10 +686,10 @@ class TestFileAdmin(ApiTestBase):
             msg_prefix=f"moderator {m} can not see 20 files",
         )
 
-        # test filtering by status to show the approved files
-        response = self.client.get(url + "?status__exact=UNPUBLISHED")
+        # test filtering to see only approved files
+        response = self.client.get(url + "?approved__exact=1")
         self.assertInHTML(
-            '<p class="paginator">5 files</p>', response.content.decode(), msg_prefix="can not see 5 unpublished files"
+            '<p class="paginator">5 files</p>', response.content.decode(), msg_prefix="can not see 5 approved files"
         )
 
         # each creator can still see 10 files
@@ -719,7 +710,7 @@ class TestFileAdmin(ApiTestBase):
         self.assertInHTML(
             '<p class="paginator">10 files</p>', response.content.decode(), msg_prefix="creator2 can not see 10 files"
         )
-        response = self.client.get(url + "?status__exact=PUBLISHED")
+        response = self.client.get(url + "?published__exact=1")
         self.assertInHTML(
             '<p class="paginator">5 files</p>', response.content.decode(), msg_prefix="can not see 5 published files"
         )
@@ -738,11 +729,11 @@ class TestFileAdmin(ApiTestBase):
         self.assertInHTML(
             '<p class="paginator">10 files</p>', response.content.decode(), msg_prefix="creator2 can not see 10 files"
         )
-        response = self.client.get(url + "?status__exact=UNPUBLISHED")
+        response = self.client.get(url + "?published__exact=0")
         self.assertInHTML(
-            '<p class="paginator">5 files</p>',
+            '<p class="paginator">10 files</p>',
             response.content.decode(),
-            msg_prefix="creator2 can not see 5 unpublished files after unpublishing",
+            msg_prefix="creator2 can not see 10 unpublished files after unpublishing",
         )
 
         # make moderator4 unapprove 5 of the files owned by creator2
@@ -750,7 +741,7 @@ class TestFileAdmin(ApiTestBase):
         self.client.login(username="moderator4", password="secret")
         response = self.client.post(url, data, follow=True)
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(url + "?status__exact=PENDING_MODERATION")
+        response = self.client.get(url + "?approved__exact=0")
         self.assertInHTML(
             '<p class="paginator">20 files</p>',
             response.content.decode(),
@@ -761,7 +752,7 @@ class TestFileAdmin(ApiTestBase):
 class TestFileViews(ApiTestBase):
     """Unit tests for regular django views."""
 
-    def test_file_list_view(self) -> None:  # noqa: PLR0915
+    def test_file_list(self) -> None:  # noqa: PLR0915
         """Test the basics of the file list view."""
         # upload some files as creator2
         self.files = [self.file_upload() for _ in range(10)]
@@ -813,19 +804,19 @@ class TestFileViews(ApiTestBase):
             rows = soup.select("div.table-container > table > tbody > tr")
             self.assertEqual(len(rows), 0, f"curator {m} can not see 0 files")
 
-        # make moderator4 approve 5 of the files owned by creator2
+        # make moderator4 approve 5 of the files owned by creator2 using the admin
         adminurl = reverse("file_admin:files_basefile_changelist")
         data = {"action": "approve", "_selected_action": self.files[:5]}
         self.client.login(username="moderator4", password="secret")
         response = self.client.post(adminurl, data, follow=True)
         self.assertEqual(response.status_code, 200)
 
-        # test filtering by status to show the approved files
-        response = self.client.get(url + "?status=UNPUBLISHED")
+        # test filtering to show only the approved files
+        response = self.client.get(url + "?approved=true")
         content = response.content.decode()
         soup = BeautifulSoup(content, "html.parser")
         rows = soup.select("div.table-container > table > tbody > tr")
-        self.assertEqual(len(rows), 5, "filtering by status does not return 5 files")
+        self.assertEqual(len(rows), 5, "filtering by approved does not return 5 files")
 
         # each curator can still see 0 files since none are published yet
         for m in ["curator6", "curator7"]:
@@ -836,7 +827,7 @@ class TestFileViews(ApiTestBase):
             rows = soup.select("div.table-container > table > tbody > tr")
             self.assertEqual(len(rows), 0, f"curator {m} can not see 0 files")
 
-        # make creator2 publish the 5 approved files
+        # make creator2 publish the 5 approved files using the admin
         adminurl = reverse("file_admin:files_basefile_changelist")
         data = {"action": "publish", "_selected_action": self.files[:5]}
         self.client.login(username="creator2", password="secret")

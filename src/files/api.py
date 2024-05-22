@@ -124,18 +124,20 @@ def upload(request: HttpRequest, f: UploadedFile, metadata: UploadRequestSchema)
 )
 def file_list(request: HttpRequest, filters: FileFilters = query) -> FileApiResponseType:  # noqa: C901,PLR0912
     """Return a list of metadata for files."""
-    # start out with a list of all PUBLISHED files plus whatever else the user has explicit access to
-    files = BaseFile.objects.filter(status="PUBLISHED") | get_objects_for_user(
-        request.user,
-        "files.view_basefile",
-    )
-    files = files.distinct()
+    # start out with a list of all permitted files and filter from there
+    files = BaseFile.bmanager.get_permitted(user=request.user).all()
 
     if filters.albums:
         files = files.filter(memberships__album__in=filters.albums, memberships__period__contains=timezone.now())
 
-    if filters.statuses:
-        files = files.filter(status__in=filters.statuses)
+    if filters.approved:
+        files = files.filter(approved=filters.approved)
+
+    if filters.published:
+        files = files.filter(published=filters.published)
+
+    if filters.deleted:
+        files = files.filter(deleted=filters.deleted)
 
     if filters.filetypes:
         query = Q()
@@ -190,11 +192,10 @@ def file_list(request: HttpRequest, filters: FileFilters = query) -> FileApiResp
 
 
 ############## GENERIC FILE ACTION ############################################
-def api_file_action(  # noqa: PLR0913
+def api_file_action(
     request: HttpRequest,
     file_uuids: list[uuid.UUID] | uuid.UUID,
     permission: str,
-    old_status: str,
     action: str,
     *,
     check: bool,
@@ -206,16 +207,14 @@ def api_file_action(  # noqa: PLR0913
     else:
         single = False
     file_filter: dict[str, str | list[str]] = {"uuid__in": [str(u) for u in file_uuids]}
-    if old_status:
-        file_filter["status"] = old_status
-    db_files = get_objects_for_user(request.user, permission, klass=BaseFile.objects.filter(**file_filter))
+    db_files = get_objects_for_user(request.user, permission, klass=BaseFile.bmanager.filter(**file_filter))
     db_uuids = list(db_files.values_list("uuid", flat=True))
     logger.debug(
         f"user {request.user} wants to {action} {len(file_uuids)} files, has perm {permission} for {len(db_uuids)}"
     )
     if len(file_uuids) != db_files.count():
         errors = len(file_uuids) - db_files.count()
-        return 403, {"message": f"Wrong status/no permission to {action} {errors} of {len(file_uuids)} files)"}
+        return 403, {"message": f"No permission to {action} {errors} of {len(file_uuids)} files)"}
     if check:
         return 202, {"message": "OK"}
     updated = getattr(db_files, action)()
@@ -230,12 +229,11 @@ def api_file_action(  # noqa: PLR0913
 
 ############## APPROVE ########################################################
 def approve(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: bool) -> FileApiResponseType:
-    """Approve one or more files by changing the status of a list of files from PENDING_MODERATION to UNPUBLISHED."""
+    """Approve one or more files."""
     return api_file_action(
         request,
         uuids,
         "approve_basefile",
-        old_status="PENDING_MODERATION",
         action="approve",
         check=check,
     )
@@ -248,12 +246,12 @@ def approve(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: 
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Approve a file (change status from PENDING_MODERATION to UNPUBLISHED).",
+    summary="Approve a single file.",
 )
 def approve_file(
     request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of a single file from PENDING_MODERATION to UNPUBLISHED."""
+    """API endpoint to approve a single file."""
     return approve(request, file_uuid.file_uuid, check=check)
 
 
@@ -264,24 +262,23 @@ def approve_file(
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Approve multiple files (change status from PENDING_MODERATION to UNPUBLISHED).",
+    summary="Approve multiple files.",
 )
 def approve_files(
     request: HttpRequest, payload: MultipleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of multiple files from PENDING_MODERATION to UNPUBLISHED."""
+    """API endpoint to approve multiple files."""
     uuids = payload.dict()["files"]
     return approve(request, uuids, check=check)
 
 
 ############## UNAPPROVE ######################################################
 def unapprove(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: bool) -> FileApiResponseType:
-    """Unapprove one or more files by changing the status of a list of files to PENDING_MODERATION."""
+    """Unapprove one or more files."""
     return api_file_action(
         request,
         uuids,
         "unapprove_basefile",
-        old_status="",
         action="unapprove",
         check=check,
     )
@@ -294,12 +291,12 @@ def unapprove(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Unapprove a file (change status to PENDING_MODERATION).",
+    summary="Unapprove a single file.",
 )
 def unapprove_file(
     request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of a single file to PENDING_MODERATION."""
+    """API endpoint to unapprove a single file."""
     return unapprove(request, file_uuid.file_uuid, check=check)
 
 
@@ -310,24 +307,23 @@ def unapprove_file(
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Unapprove multiple files (change status to PENDING_MODERATION).",
+    summary="Unapprove multiple files.",
 )
 def unapprove_files(
     request: HttpRequest, payload: MultipleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of multiple files to PENDING_MODERATION."""
+    """API endpoint to unapprove multiple files."""
     uuids = payload.dict()["files"]
     return unapprove(request, uuids, check=check)
 
 
 ############## PUBLISH ########################################################
 def publish(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: bool) -> FileApiResponseType:
-    """Publish a list of files by changing the status from UNPUBLISHED to PUBLISHED."""
+    """Publish a list of files."""
     return api_file_action(
         request,
         uuids,
         "publish_basefile",
-        old_status="UNPUBLISHED",
         action="publish",
         check=check,
     )
@@ -340,12 +336,12 @@ def publish(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: 
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Publish a file (change status from UNPUBLISHED to PUBLISHED).",
+    summary="Publish a single file.",
 )
 def publish_file(
     request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of a single file from UNPUBLISHED to PUBLISHED."""
+    """API endpoint to publish a single file."""
     return publish(request, file_uuid.file_uuid, check=check)
 
 
@@ -356,22 +352,21 @@ def publish_file(
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Publish multiple files (change status from UNPUBLISHED to PUBLISHED).",
+    summary="Publish multiple files.",
 )
 def publish_files(request: HttpRequest, data: MultipleFileRequestSchema, *, check: bool = False) -> FileApiResponseType:
-    """Change the status of files from UNPUBLISHED to PUBLISHED."""
+    """Publish multiple files."""
     files = data.dict()["files"]
     return publish(request, files, check=check)
 
 
 ############## UNPUBLISH ########################################################
 def unpublish(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check: bool) -> FileApiResponseType:
-    """Unpublish a list of files by changing the status from PUBLISHED to UNPUBLISHED."""
+    """Unpublish a list of files."""
     return api_file_action(
         request,
         uuids,
         "unpublish_basefile",
-        old_status="PUBLISHED",
         action="unpublish",
         check=check,
     )
@@ -384,12 +379,12 @@ def unpublish(request: HttpRequest, uuids: list[uuid.UUID] | uuid.UUID, *, check
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Unpublish a file (change status from PUBLISHED to UNPUBLISHED).",
+    summary="Unpublish a single file.",
 )
 def unpublish_file(
     request: HttpRequest, file_uuid: SingleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """API endpoint to change the status of a single file from PUBLISHED to UNPUBLISHED."""
+    """API endpoint to unpublish a single file."""
     return unpublish(request, file_uuid.file_uuid, check=check)
 
 
@@ -400,12 +395,12 @@ def unpublish_file(
         202: ApiMessageSchema,
         403: ApiMessageSchema,
     },
-    summary="Unpublish multiple files (change status from PUBLISHED to UNPUBLISHED).",
+    summary="Unpublish multiple files.",
 )
 def unpublish_files(
     request: HttpRequest, data: MultipleFileRequestSchema, *, check: bool = False
 ) -> FileApiResponseType:
-    """Change the status of files from PUBLISHED to UNPUBLISHED."""
+    """Unpublish multple files."""
     files = data.dict()["files"]
     return unpublish(request, files, check=check)
 
@@ -424,10 +419,7 @@ def unpublish_files(
 def file_get(request: HttpRequest, file_uuid: uuid.UUID) -> FileApiResponseType:
     """Return a file object."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
-    if basefile.status == "PUBLISHED" or request.user.has_perm(
-        "view_basefile",
-        basefile,
-    ):
+    if basefile.permitted(user=request.user):
         return 200, {"bma_response": basefile}
     return 403, {"message": "Permission denied."}
 
@@ -504,18 +496,18 @@ def file_update(
         403: ApiMessageSchema,
         404: ApiMessageSchema,
     },
-    summary="Delete a file (change status to PENDING_DELETION).",
+    summary="Soft-delete a file.",
 )
 def file_delete(
     request: HttpRequest, file_uuid: uuid.UUID, *, check: bool = False
 ) -> tuple[int, dict[str, str] | None]:
     """Mark a file for deletion."""
     basefile = get_object_or_404(BaseFile, uuid=file_uuid)
-    if not request.user.has_perm("delete_basefile", basefile):
+    if not request.user.has_perm("softdelete_basefile", basefile):
         return 403, {"message": "Permission denied."}
     if check:
         # check mode requested, don't change anything
         return 202, {"message": "OK"}
     # ok go but we don't let users fully delete files for now
-    basefile.update_status(new_status="PENDING_DELETION")
+    basefile.softdelete()
     return 204, None

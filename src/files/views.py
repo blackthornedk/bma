@@ -22,7 +22,6 @@ from django.views.generic import TemplateView
 from django.views.generic import UpdateView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from guardian.shortcuts import get_objects_for_user
 
 from .filters import FileFilter
 from .forms import UpdateForm
@@ -49,12 +48,8 @@ class FileListView(SingleTableMixin, FilterView):
     context_object_name = "files"
 
     def get_queryset(self) -> QuerySet[BaseFile]:
-        """Get files that are PUBLISHED or where the current user has view_basefile perms."""
-        files = BaseFile.objects.filter(status="PUBLISHED").prefetch_related("uploader") | get_objects_for_user(
-            self.request.user,
-            "files.view_basefile",
-        ).prefetch_related("uploader")
-        return files.distinct()  # type: ignore[no-any-return]
+        """Get files that are approved, published and not deleted, or where the current user has view_basefile perms."""
+        return BaseFile.bmanager.get_permitted(user=self.request.user).all()  # type: ignore[no-any-return]
 
 
 class FileDetailView(DetailView):  # type: ignore[type-arg]
@@ -66,8 +61,8 @@ class FileDetailView(DetailView):  # type: ignore[type-arg]
     def get_object(self, queryset: QuerySet[BaseFile] | None = None) -> BaseFile:
         """Check permissions before returning the file."""
         basefile = super().get_object(queryset=queryset)
-        if not self.request.user.has_perm("files.view_basefile", basefile) and basefile.status != "PUBLISHED":
-            # file is not PUBLISHED, and the current user does not have permissions to view this file
+        if not basefile.permitted(user=self.request.user):
+            # the current user does not have permissions to view this file
             raise PermissionDenied
         return basefile  # type: ignore[no-any-return]
 
@@ -82,7 +77,7 @@ class FileDeleteView(DeleteView):  # type: ignore[type-arg]
         """Check permissions before soft deleting file."""
         if not self.request.user.has_perm("files.delete_basefile", self.object):
             raise PermissionDenied
-        self.object.update_status(new_status="PENDING_DELETION")
+        self.object.softdelete()
         return HttpResponseRedirect(reverse_lazy("files:detail", kwargs={"pk": self.object.uuid}))
 
 
@@ -123,8 +118,8 @@ def bma_media_view(request: HttpRequest, path: str, *, accel: bool) -> FileRespo
         raise Http404 from e
 
     # check file permissions
-    if not request.user.has_perm("files.view_basefile", dbfile) and dbfile.status != "PUBLISHED":
-        # file is not PUBLISHED and the current user does not have permissions to view this file
+    if not dbfile.permitted(user=request.user):
+        # the current user does not have permissions to view this file
         raise PermissionDenied
 
     # check if the file exists in the filesystem

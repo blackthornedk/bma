@@ -21,7 +21,7 @@ class AlbumFilters(ListFilters):
 
 def get_permitted_files(request: HttpRequest) -> QuerySet[BaseFile]:
     """Called by AlbumFilter to get files for the albumlist filter multiselect form field."""
-    return BaseFile.permitted_files.get_queryset(user=request.user).all()
+    return BaseFile.bmanager.get_permitted(user=request.user).all()  # type: ignore[no-any-return]
 
 
 class AlbumFilter(django_filters.FilterSet):

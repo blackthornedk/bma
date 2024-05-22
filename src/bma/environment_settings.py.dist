@@ -93,14 +93,6 @@ FILETYPE_ICONS = {
     "document": "fas fa-file-lines",
 }
 
-# status icons
-FILESTATUS_ICONS = {
-    "PENDING_MODERATION": "fas fa-clock",
-    "UNPUBLISHED": "fas fa-cloud-xmark",
-    "PUBLISHED": "fas fa-cloud-check",
-    "PENDING_DELETION": "fas fa-thrash-clock",
-}
-
 DEFAULT_THUMBNAIL_URLS = {
     "basefile": "/static/images/file-solid.png",
     "picture": "/static/images/file-image-solid.png",

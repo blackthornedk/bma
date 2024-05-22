@@ -6,33 +6,22 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import HttpRequest
 from django.urls import reverse
+from django.utils import timezone
 from guardian.shortcuts import assign_perm
 from guardian.shortcuts import get_objects_for_user
-from guardian.shortcuts import remove_perm
 from polymorphic.managers import PolymorphicQuerySet
 from polymorphic.models import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 from users.sentinel import get_sentinel_user
 
-from .validators import validate_file_status
 from .validators import validate_thumbnail_url
 
 logger = logging.getLogger("bma")
 
 User = get_user_model()
-
-
-class StatusChoices(models.TextChoices):
-    """The possible status choices for a file."""
-
-    PENDING_MODERATION = ("PENDING_MODERATION", "Pending Moderation")
-    UNPUBLISHED = ("UNPUBLISHED", "Unpublished")
-    PUBLISHED = ("PUBLISHED", "Published")
-    PENDING_DELETION = ("PENDING_DELETION", "Pending Deletion")
 
 
 license_urls = {
@@ -65,46 +54,46 @@ class FileTypeChoices(models.TextChoices):
 class BaseFileQuerySet(PolymorphicQuerySet):
     """Custom queryset and manager for file operations."""
 
+    def change_bool(self, *, field: str, value: bool) -> int:
+        """Change a bool field on a queryset of files."""
+        kwargs = {field: value, "updated": timezone.now()}
+        self.update(**kwargs)
+        return int(self.count())
+
     def approve(self) -> int:
         """Approve files in queryset."""
-        updated = 0
-        for basefile in self:
-            updated += basefile.approve()
-        return updated
+        return self.change_bool(field="approved", value=True)
 
     def unapprove(self) -> int:
         """Unapprove files in queryset."""
-        updated = 0
-        for basefile in self:
-            updated += basefile.unapprove()
-        return updated
+        return self.change_bool(field="approved", value=False)
 
     def publish(self) -> int:
         """Publish files in queryset."""
-        updated = 0
-        for basefile in self:
-            updated += basefile.publish()
-        return updated
+        return self.change_bool(field="published", value=True)
 
     def unpublish(self) -> int:
         """Unpublish files in queryset."""
-        updated = 0
-        for basefile in self:
-            updated += basefile.unpublish()
-        return updated
+        return self.change_bool(field="published", value=False)
 
+    def delete(self) -> int:
+        """Delete files in queryset."""
+        return self.change_bool(field="deleted", value=True)
 
-class PermittedFilesManager(PolymorphicManager):
-    """A custom manager which only returns the files the user has access to."""
+    def undelete(self) -> int:
+        """Undelete files in queryset."""
+        return self.change_bool(field="deleted", value=False)
 
-    def get_queryset(self, user: User) -> models.QuerySet["BaseFile"]:  # type: ignore[valid-type]
-        """Return PUBLISHED files and files where the user has view_basefile perms."""
-        files = super().get_queryset().filter(status="PUBLISHED") | get_objects_for_user(
+    def get_permitted(self, user: User) -> models.QuerySet["BaseFile"]:  # type: ignore[valid-type]
+        """Return files that are approved, published and not deleted, plus files where the user has view_basefile."""
+        approved_files = self.filter(approved=True, published=True, deleted=False).prefetch_related("uploader")
+        perm_files = get_objects_for_user(
             user=user,
             perms="files.view_basefile",
-            klass=super().get_queryset(),
-        )
-        # do not return duplicates when a file is PUBLISHED and a user also has files.view_basefile
+            klass=self.all(),
+        ).prefetch_related("uploader")
+        files = approved_files | perm_files
+        # do not return duplicates
         return files.distinct()  # type: ignore[no-any-return]
 
 
@@ -120,13 +109,15 @@ class BaseFile(PolymorphicModel):
             ("approve_basefile", "Approve file"),
             ("unpublish_basefile", "Unpublish file"),
             ("publish_basefile", "Publish file"),
+            ("undelete_basefile", "Undelete file"),
+            ("softdelete_basefile", "Soft delete file"),
         )
         verbose_name = "file"
         verbose_name_plural = "files"
 
-    objects = PolymorphicManager.from_queryset(BaseFileQuerySet)()
+    objects = PolymorphicManager()
 
-    permitted_files = PermittedFilesManager()
+    bmanager = PolymorphicManager.from_queryset(BaseFileQuerySet)()
 
     uuid = models.UUIDField(
         primary_key=True,
@@ -182,13 +173,19 @@ class BaseFile(PolymorphicModel):
         "This is usually the real name or handle of the author(s) or licensor of the file.",
     )
 
-    status = models.CharField(
-        max_length=20,
-        blank=False,
-        validators=[validate_file_status],
-        choices=StatusChoices.choices,
-        default="PENDING_MODERATION",
-        help_text="The status of this file. Only published files are visible on the public website.",
+    approved = models.BooleanField(
+        default=False,
+        help_text="Has this file been approved by a moderator?",
+    )
+
+    published = models.BooleanField(
+        default=False,
+        help_text="Has this file been published?",
+    )
+
+    deleted = models.BooleanField(
+        default=False,
+        help_text="Has this file been deleted?",
     )
 
     original_filename = models.CharField(
@@ -216,11 +213,6 @@ class BaseFile(PolymorphicModel):
     def filetype_icon(self) -> str:
         """The filetype icon."""
         return settings.FILETYPE_ICONS[self.filetype]
-
-    @property
-    def status_icon(self) -> str:
-        """Status icon."""
-        return settings.FILESTATUS_ICONS[self.status]
 
     @property
     def license_name(self) -> str:
@@ -291,43 +283,44 @@ class BaseFile(PolymorphicModel):
         links["downloads"] = downloads
         return links
 
-    def update_status(self, new_status: str) -> int:
-        """Update the status of a file."""
-        self.status = new_status
-        try:
-            self.full_clean()
-            self.save(update_fields=["status", "updated"])
-        except ValidationError:
-            logger.exception("Invalid file status.")
-            return 0
-        return 1
+    def update_field(self, *, field: str, value: bool) -> None:
+        """Update a bool field on the model atomically."""
+        setattr(self, field, value)
+        self.save(update_fields=[field, "updated"])
 
-    def approve(self) -> int:
+    def approve(self) -> None:
         """Approve this file and add publish/unpublish permissions to the uploader."""
-        assign_perm("publish_basefile", self.uploader, self)
-        assign_perm("unpublish_basefile", self.uploader, self)
-        return self.unpublish()
+        self.update_field(field="approved", value=True)
 
-    def unapprove(self) -> int:
+    def unapprove(self) -> None:
         """Unapprove this file and remove publish/unpublish permissions from the uploader."""
-        remove_perm("publish_basefile", self.uploader, self)
-        remove_perm("unpublish_basefile", self.uploader, self)
-        return self.update_status(new_status="PENDING_MODERATION")
+        self.update_field(field="approved", value=False)
 
-    def publish(self) -> int:
+    def publish(self) -> None:
         """Publish this file."""
-        return self.update_status(new_status="PUBLISHED")
+        self.update_field(field="published", value=True)
 
-    def unpublish(self) -> int:
+    def unpublish(self) -> None:
         """Unpublish this file."""
-        return self.update_status(new_status="UNPUBLISHED")
+        self.update_field(field="published", value=False)
+
+    def softdelete(self) -> None:
+        """Soft delete this file."""
+        self.update_field(field="deleted", value=True)
+
+    def undelete(self) -> None:
+        """Undelete this file."""
+        self.update_field(field="deleted", value=False)
 
     def add_initial_permissions(self) -> None:
         """Add initial permissions for newly uploaded files."""
         # add uploader permissions
         assign_perm("view_basefile", self.uploader, self)
         assign_perm("change_basefile", self.uploader, self)
-        assign_perm("delete_basefile", self.uploader, self)
+        assign_perm("publish_basefile", self.uploader, self)
+        assign_perm("unpublish_basefile", self.uploader, self)
+        assign_perm("softdelete_basefile", self.uploader, self)
+        assign_perm("undelete_basefile", self.uploader, self)
         moderators, created = Group.objects.get_or_create(name=settings.BMA_MODERATOR_GROUP_NAME)
         if created:
             logger.debug("Created new group 'moderators'")
@@ -335,3 +328,9 @@ class BaseFile(PolymorphicModel):
         assign_perm("view_basefile", moderators, self)
         assign_perm("approve_basefile", moderators, self)
         assign_perm("unapprove_basefile", moderators, self)
+
+    def permitted(self, user: User) -> bool:  # type: ignore[valid-type]
+        """Convenience method to determine if viewing this file is permitted for a user."""
+        if user.has_perm("files.view_basefile", self) or all([self.approved, self.published, not self.deleted]):  # type: ignore[attr-defined]
+            return True
+        return False

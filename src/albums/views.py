@@ -18,7 +18,6 @@ from django.views.generic import DetailView
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
 from files.models import BaseFile
-from guardian.shortcuts import get_objects_for_user
 
 from .filters import AlbumFilter
 from .models import Album
@@ -69,13 +68,9 @@ class AlbumCreateView(LoginRequiredMixin, CreateView):  # type: ignore[type-arg]
             raise PermissionDenied
 
     def get_form(self, form_class: Any | None = None) -> Form:  # noqa: ANN401
-        """Return an instance of the form to be used in this view."""
+        """Return an instance of the form to be used in this view, only show permitted files in the form."""
         form = super().get_form()
-        files = BaseFile.objects.filter(status="PUBLISHED").prefetch_related("uploader") | get_objects_for_user(
-            self.request.user,
-            "files.view_basefile",
-        ).prefetch_related("uploader")
-        form.fields["files"].queryset = files.distinct()
+        form.fields["files"].queryset = BaseFile.bmanager.get_permitted(user=self.request.user)
         return form  # type: ignore[no-any-return]
 
     def form_valid(self, form: Form) -> HttpResponseRedirect:

@@ -10,7 +10,6 @@ from utils.schema import ApiResponseSchema
 from utils.schema import ObjectPermissionSchema
 
 from files.models import BaseFile
-from files.models import StatusChoices
 
 from .models import LicenseChoices
 
@@ -84,8 +83,9 @@ class FileResponseSchema(ModelSchema):
     filetype: str
     filetype_icon: str
     source: str
-    status: str
-    status_icon: str
+    approved: bool
+    published: bool
+    deleted: bool
     size_bytes: int
     permissions: ObjectPermissionSchema
     license_name: str
@@ -104,7 +104,9 @@ class FileResponseSchema(ModelSchema):
             "description",
             "license",
             "attribution",
-            "status",
+            "approved",
+            "published",
+            "deleted",
             "original_filename",
             "thumbnail_url",
         )
@@ -130,11 +132,6 @@ class FileResponseSchema(ModelSchema):
     def resolve_links(obj: BaseFile, context: dict[str, HttpRequest]) -> dict[str, str | dict[str, str]]:
         """Get the value for the links field."""
         return obj.resolve_links(request=context["request"])
-
-    @staticmethod
-    def resolve_status(obj: BaseFile, context: dict[str, HttpRequest]) -> str:
-        """Get the value for the file status field."""
-        return StatusChoices[obj.status].label
 
     @staticmethod
     def resolve_permissions(obj: BaseFile, context: dict[str, HttpRequest]) -> ObjectPermissionSchema:

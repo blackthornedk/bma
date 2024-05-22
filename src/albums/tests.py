@@ -209,7 +209,7 @@ class TestAlbumViews(ApiTestBase):
             self.files.append(self.file_upload(uploader="creator3"))
         self.album_create(title="creator3 files", files=self.files[10:], creator="curator7")
 
-    def test_album_list_view(self) -> None:
+    def test_album_list(self) -> None:
         """Test the basics of the album list view."""
         url = reverse("albums:album_list")
         self.create_albums()

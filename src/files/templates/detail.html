@@ -33,9 +33,9 @@
             </button>
             <ul class="dropdown-menu" aria-labelledby="dropdownActionsButton1">
               <li><a class="dropdown-item" href="#">[Add to album]</a></li>
-                {% if object.status == "UNPUBLISHED" and perms.files.publish_basefile %}
+                {% if not object.published and perms.files.publish_basefile %}
                 <li><a class="dropdown-item" href="#">Publish</a></li>
-                {% elif object.status == "PUBLISHED" and perms.files.unpublish_basefile %}
+                {% elif object.published and perms.files.unpublish_basefile %}
                 <li><a class="dropdown-item" href="#">Unpublish</a></li>
                 {% endif %}
               {% if perms.files.delete_basefile %}

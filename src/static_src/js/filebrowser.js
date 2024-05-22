@@ -245,17 +245,6 @@
             ftcol.appendChild(ftsel);
             form.appendChild(ftcol);
 
-            // filestatus select
-            const fscol = $this.createNode("div", "col-auto");
-            const fssel = $this.createNode("select", "form-select", {"name": $this.prefix + "status", "multiple": "multiple", "onchange": $this.updateFileBrowser}, [
-                $this.createNode("option", [], {"value": "PENDING_MODERATION", "text": "Pending Moderation"}),
-                $this.createNode("option", [], {"value": "UNPUBLISHED", "text": "Unpublished"}),
-                $this.createNode("option", [], {"value": "PUBLISHED", "text": "Published"}),
-                $this.createNode("option", [], {"value": "PENDING_DELETION", "text": "Pending Deletion"}),
-            ]);
-            fscol.appendChild(fssel);
-            form.appendChild(fscol);
-
             // file license select
             const flcol = $this.createNode("div", "col-auto");
             const flsel = $this.createNode("select", "form-select", {"name": $this.prefix + "license", "multiple": "multiple", "onchange": $this.updateFileBrowser}, [

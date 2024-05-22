@@ -18,7 +18,7 @@ from .models import BaseFile
 class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
     """The ModelAdmin class to manage files. Used by the regular admin and FileAdmin."""
 
-    readonly_fields = ("status", "original_filename", "file_size", "license", "uploader")
+    readonly_fields = ("original_filename", "file_size", "license", "uploader", "approved", "published", "deleted")
     list_display = (
         "uuid",
         "uploader",
@@ -30,9 +30,11 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         "title",
         "license",
         "attribution",
-        "status",
+        "approved",
+        "published",
+        "deleted",
     )
-    list_filter = ("license", "status", "uploader", "attribution")
+    list_filter = ("license", "uploader", "attribution", "approved", "published", "deleted")
     actions = ("approve", "unapprove", "publish", "unpublish")
 
     def get_actions(self, request: HttpRequest) -> dict[str, tuple[Callable[..., str], str, str] | None]:
@@ -51,11 +53,11 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         if request.user.is_superuser:
             # superusers can see all files
             return super().get_queryset(request)
-        return get_objects_for_user(request.user, "view_basefile", klass=BaseFile)  # type: ignore[no-any-return]
+        return BaseFile.bmanager.get_permitted(user=request.user)  # type: ignore[no-any-return]
 
     def delete_queryset(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
         """Soft delete."""
-        queryset.update(status="PENDING_DELETION")
+        queryset.update(deleted=True)
 
     def has_module_permission(self, request: HttpRequest) -> bool:
         """All users may see this modules index page."""
@@ -117,6 +119,22 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
             return True
         return False
 
+    def has_softdelete_basefile_permission(self, request: HttpRequest, obj: BaseFile | None = None) -> bool:
+        """Called by the admin to check if the user has permission to softdelete this type of/this specific object."""
+        if obj is None:
+            return True
+        if request.user.has_perm("softdelete_basefile", obj):
+            return True
+        return False
+
+    def has_undelete_basefile_permission(self, request: HttpRequest, obj: BaseFile | None = None) -> bool:
+        """Called by the admin to check if the user has permission to undelete this type of/this specific object."""
+        if obj is None:
+            return True
+        if request.user.has_perm("undelete_basefile", obj):
+            return True
+        return False
+
     def send_message(self, request: HttpRequest, selected: int, valid: int, updated: int, action: str) -> None:  # noqa: PLR0913
         """Return a message to the user."""
         # set status
@@ -131,21 +149,19 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         )
 
     @admin.action(
-        description="Approve selected %(verbose_name_plural)s (switch status from PENDING_MODERATION to UNPUBLISHED)",
+        description="Approve selected %(verbose_name_plural)s",
         permissions=["approve_basefile"],
     )
     def approve(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
         """Admin action to approve files."""
         selected = queryset.count()
-        valid = get_objects_for_user(request.user, "files.approve_basefile", klass=queryset).filter(
-            status="PENDING_MODERATION"
-        )
+        valid = get_objects_for_user(request.user, "files.approve_basefile", klass=queryset)
         valids = valid.count()
         updated = valid.approve()
         self.send_message(request, selected=selected, valid=valids, updated=updated, action="approved")
 
     @admin.action(
-        description="Unapprove selected %(verbose_name_plural)s (switch status to PENDING_MODERATION)",
+        description="Unapprove selected %(verbose_name_plural)s",
         permissions=["unapprove_basefile"],
     )
     def unapprove(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
@@ -154,35 +170,55 @@ class BaseFileAdmin(admin.ModelAdmin[BaseFile]):
         valid = get_objects_for_user(request.user, "files.unapprove_basefile", klass=queryset)
         valids = valid.count()
         updated = valid.unapprove()
-        self.send_message(request, selected=selected, valid=valids, updated=updated, action="approved")
+        self.send_message(request, selected=selected, valid=valids, updated=updated, action="unapproved")
 
     @admin.action(
-        description="Publish selected %(verbose_name_plural)s (switch status from UNPUBLISHED to PUBLISHED)",
+        description="Publish selected %(verbose_name_plural)s",
         permissions=["publish_basefile"],
     )
     def publish(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
         """Admin action to publish files."""
         selected = queryset.count()
-        valid = get_objects_for_user(request.user, "files.publish_basefile", klass=queryset).filter(
-            status="UNPUBLISHED"
-        )
+        valid = get_objects_for_user(request.user, "files.publish_basefile", klass=queryset)
         valids = valid.count()
         updated = valid.publish()
         self.send_message(request, selected=selected, valid=valids, updated=updated, action="published")
 
     @admin.action(
-        description="Unpublish selected %(verbose_name_plural)s (switch status from PUBLISHED to UNPUBLISHED)",
+        description="Unpublish selected %(verbose_name_plural)s",
         permissions=["unpublish_basefile"],
     )
     def unpublish(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
         """Admin action to unpublish files."""
         selected = queryset.count()
-        valid = get_objects_for_user(request.user, "files.unpublish_basefile", klass=queryset).filter(
-            status="PUBLISHED"
-        )
+        valid = get_objects_for_user(request.user, "files.unpublish_basefile", klass=queryset)
         valids = valid.count()
         updated = valid.unpublish()
         self.send_message(request, selected=selected, valid=valids, updated=updated, action="unpublished")
+
+    @admin.action(
+        description="Soft delete selected %(verbose_name_plural)s",
+        permissions=["softdelete_basefile"],
+    )
+    def softdelete(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
+        """Admin action to delete files."""
+        selected = queryset.count()
+        valid = get_objects_for_user(request.user, "files.softdelete_basefile", klass=queryset)
+        valids = valid.count()
+        updated = valid.softdelete()
+        self.send_message(request, selected=selected, valid=valids, updated=updated, action="deleted")
+
+    @admin.action(
+        description="Undelete selected %(verbose_name_plural)s",
+        permissions=["undelete_basefile"],
+    )
+    def undelete(self, request: HttpRequest, queryset: QuerySet[BaseFile]) -> None:
+        """Admin action to undelete files."""
+        selected = queryset.count()
+        valid = get_objects_for_user(request.user, "files.undelete_basefile", klass=queryset)
+        valids = valid.count()
+        updated = valid.undelete()
+        self.send_message(request, selected=selected, valid=valids, updated=updated, action="undeleted")
 
     def permissions(self, obj: BaseFile) -> str:
         """Return all defined permissions for this object."""

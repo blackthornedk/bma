@@ -10,17 +10,18 @@ from utils.filters import ListFilters
 from .models import BaseFile
 from .models import FileTypeChoices
 from .models import LicenseChoices
-from .models import StatusChoices
 
 
 class FileFilters(ListFilters):
     """The filters used for the file_list endpoint."""
 
     albums: list[uuid.UUID] | None = None
-    statuses: list[StatusChoices] | None = None
     uploaders: list[uuid.UUID] | None = None
     licenses: list[LicenseChoices] | None = None
     filetypes: list[FileTypeChoices] | None = None
+    approved: bool | None = None
+    published: bool | None = None
+    deleted: bool | None = None
     size: int | None = None
     size_lt: int | None = None
     size_gt: int | None = None
@@ -44,7 +45,9 @@ class FileFilter(django_filters.FilterSet):
         fields: ClassVar[dict[str, list[str]]] = {
             "albums": ["exact"],
             "attribution": ["exact", "icontains"],
-            "status": ["exact"],
+            "approved": ["exact"],
+            "published": ["exact"],
+            "deleted": ["exact"],
             "uploader": ["exact"],
             "license": ["exact"],
             "file_size": ["exact", "lt", "gt"],
