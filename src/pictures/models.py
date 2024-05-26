@@ -19,13 +19,7 @@ class Picture(BaseFile):  # type: ignore[django-manager-missing]
 
     small_thumbnail = ImageSpecField(
         source="original",
-        processors=[ResizeToFit(100, 100)],
-        format="JPEG",
-    )
-
-    medium_thumbnail = ImageSpecField(
-        source="original",
-        processors=[ResizeToFit(200, 200)],
+        processors=[ResizeToFit(150, 150)],
         format="JPEG",
     )
 
@@ -37,25 +31,19 @@ class Picture(BaseFile):  # type: ignore[django-manager-missing]
 
     small = ImageSpecField(
         source="original",
-        processors=[ResizeToFit(700, 700)],
+        processors=[ResizeToFit(600, 600)],
         format="JPEG",
     )
 
     medium = ImageSpecField(
         source="original",
-        processors=[ResizeToFit(1000, 1000)],
+        processors=[ResizeToFit(1200, 1200)],
         format="JPEG",
     )
 
     large = ImageSpecField(
         source="original",
-        processors=[ResizeToFit(1500, 1500)],
-        format="JPEG",
-    )
-
-    slideshow = ImageSpecField(
-        source="original",
-        processors=[ResizeToFit(2400, 1600)],
+        processors=[ResizeToFit(2400, 2400)],
         format="JPEG",
     )
 
