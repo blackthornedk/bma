@@ -21,30 +21,35 @@ class Picture(BaseFile):  # type: ignore[django-manager-missing]
         source="original",
         processors=[ResizeToFit(150, 150)],
         format="JPEG",
+        options={"quality": 60},
     )
 
     large_thumbnail = ImageSpecField(
         source="original",
         processors=[ResizeToFit(300, 300)],
         format="JPEG",
+        options={"quality": 60},
     )
 
     small = ImageSpecField(
         source="original",
         processors=[ResizeToFit(600, 600)],
         format="JPEG",
+        options={"quality": 60},
     )
 
     medium = ImageSpecField(
         source="original",
         processors=[ResizeToFit(1200, 1200)],
         format="JPEG",
+        options={"quality": 60},
     )
 
     large = ImageSpecField(
         source="original",
         processors=[ResizeToFit(2400, 2400)],
         format="JPEG",
+        options={"quality": 60},
     )
 
     tags = TaggableManager(
