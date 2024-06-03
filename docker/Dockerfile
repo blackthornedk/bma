@@ -10,9 +10,6 @@ ENV PYTHONFAULTHANDLER=1 \
 
 WORKDIR /app
 
-ADD pyproject.toml /tmp/pyproject.toml
-ADD README.md /tmp/README.md
-
 RUN apt-get update \
   && apt-get install -y \
     build-essential \
@@ -29,10 +26,8 @@ RUN apt-get update \
     libgdal-dev \
     wkhtmltopdf
 
-RUN pip3 install --no-cache-dir pip-tools
-
-RUN pip-compile --generate-hashes --output-file /tmp/dev.txt --extra dev /tmp/pyproject.toml --verbose
-RUN pip3 install --no-cache-dir  -r /tmp/dev.txt
+RUN --mount=type=bind,readwrite,source=.,target=/app \
+  pip3 install --no-cache-dir /app[test]
 
 RUN groupadd -g 1000 www
 RUN useradd -u 1000 -ms /bin/bash -g www www
