@@ -27,7 +27,7 @@ RUN apt-get update \
     wkhtmltopdf
 
 RUN --mount=type=bind,readwrite,source=.,target=/app \
-  pip3 install --no-cache-dir /app[test]
+  pip3 install --no-cache-dir /app[dev,test]
 
 RUN groupadd -g 1000 www
 RUN useradd -u 1000 -ms /bin/bash -g www www
