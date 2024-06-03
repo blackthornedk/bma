@@ -17,3 +17,5 @@ services:
         environment:
           - POSTGRES_USER=bma
           - POSTGRES_PASSWORD=hunter12
+        ports:
+          - "${db_port}:5432"
