@@ -6,7 +6,7 @@ PARALLEL=4
 TEST_OPTIONS = --failfast --keepdb --parallel ${PARALLEL}
 TEST_TO_RUN = .
 
-init: copy_env_file update_submodules migrate
+init: copy_env_file migrate
 
 run:
 	${DOCKER_COMPOSE} up
@@ -35,9 +35,4 @@ build_docker_image:
 
 copy_env_file:
 	test -f src/bma/environment_settings.py || cp src/bma/environment_settings.py.dist src/bma/environment_settings.py
-	# copy over env file if it doesn't exist and uncomment all commented lines
-	test -f src/bma/.env || cp src/bma/.env.dist src/bma/.env && sed -i 's/^#//g' src/bma/.env
 	test -f docker/.env || cp docker/.env.dev docker/.env
-
-update_submodules:
-	git submodule update --init --recursive
